@@ -1,5 +1,8 @@
 
 #include <list>
+#include <iostream>
+#include "parse.hpp"
+
 using namespace std;
 
 /** Compiling strictly typed non-deterministic programming language based on lambda-calculus, reactive programming, type theory and fractal growth to easily handle composition.*/
@@ -23,15 +26,18 @@ struct Entity {
 };
 
 int main() {
-    parse_ast();
+    parse();
+    //parse_ast();
 
-    pulse_ast_with_numbered_waves_by_composing_layered_waves_on_entities();
+    //pulse_ast_with_numbered_waves_by_composing_layered_waves_on_entities();
 
     //every composition needs to be reversible (so to define sqrt() function you'll have to define complex numbers and thus recompose (+),(-),(*), etc)
 
     //composition works on types as well
 
     //the resulting graph might get shrunk to the lowest possible size (although can get functionized if properly represented with lie-groups on data-types (which are algebraic since compositions are reversible)) and outputed as is or directly executed as regular functional program
+
+    return 0;
 }
 
 /**
@@ -41,3 +47,5 @@ a ∘= b + c
 //applicative definition: another logic added on top of 'a':
 a ∘+ g + 1
 */
+
+//when function (program/endity/...) is composed on top of itself, it means at least that it takes the same type as it returns (where type is the space and values are points in that space). But the result of such composition is the different type ofc. Implementation of computation on top of that composition (on top of expression of composition) spawns new instance of type (where it's called "value") and instance is the same on the left side of composition and the right side of composion (same besides having just similar value). Thus, the moment of such instantiation requires permorming the branching of the whole composition graph.

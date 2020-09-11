@@ -1,0 +1,45 @@
+While trying to utilize FRP paradigm in functional languages I stumbled across inability for functions to have multiple definitions. I'm just yet learning both FRP and FP, but seems like none of FP languages allow multiple function definitions (they just don't make sense?).  
+I want to have programming language which allows having multiple definitions for functions (terms/compositions), but don't quite capture that meaning as well. Let me reason about multiple definitions this way by defining `programming language` right here right now (*when compiler output can't be the result but has to be some program, then input is just insufficient to calculate output and requires to wait for future values, so I'm not going to cover such cases because they don't make any difference*).
+Let this be statements in some `declarative programming language`:
+    a = b + 2
+    a = c - 1
+    c = 4
+    program = b
+with `compiler` being *simple* equations solver which --compiles--converts it to:
+    //a = 3
+    b = 1
+    //c = 4
+This system can be solved by simple substitution (without even linear algebra), but what's interesting here is this equivalence:
+    a ~ b + 2 = c - 1
+If we plot first *expressions* directly: (image_1.png) ...
+Here's more complicated example of such *theoretical* reasoning which can be carried out only with specified notion of equivalence: TODO (use *if*s)
+
+And then I want to compose another statement on top of my *up'n'running program*:
+    d = c = 5 ∘ program
+    program = d
+    => b = 2
+
+Fun begins when you then compose like this:
+    c = x
+    if x > 10 then d = 0
+    => ?
+Composition graph of such *imaginary* program looks like this: (image_with_knots.png)
+
+I'm casually learning math a little bit and it reminds me of these topological topics of surface degrees: TODO
+For now my view fluctuates around something like synthesizing a program by composing paths on topological surfaces (which are built from types) where they start from program inputs and end on program outputs, but types need to be somehow detangled on intersection points (knots?). My math knowledge is insufficient for jumping to actually implementing such language :(
+Is there some research or development of some kind computing functions this way? Can I somewhere know more about these kinds of topics?
+
+
+TODO:
+    ... somewhat related topics: https://www.youtube.com/watch?v=caSOTjr1z18
+
+Prime intentions:
+    - allow non-intrusive compositions, for example compose arbitrary data type with 'red-black tree element' notion as separate statement
+
+About me: full-time full-stack programmer with expertise at system development, multithreading, web etc. Casually learning math for both fun and serious. Want to adapt as much of math as possible into everyday programming tasks. Recently was upset about Haskell being unable to compose simple logging functionality on top of arbitrary function without modifying it's code. Have a dream to get language where developer will be able to compose arbitrary data structure with "element of red-black tree" in a single expression and also reason about program memory usage.
+
+P.S. Curious coincidence how FRP based on purely syntactical *topological* sort leads to reason about it's nature probably in terms of *topology* ^^
+
+
+tags: denotational semantics programming language manifolds topology homology type-theory
+

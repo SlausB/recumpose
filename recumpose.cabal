@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f7a82168b543edd16ff5597d1938e15a832db112376b87cd4ccaf82f20867fce
+-- hash: df951c6adb6a1784e5b64261d62c7768d420693bd2d5f4d42796b59488fee090
 
 name:           recumpose
 version:        0.1.0.0
@@ -34,7 +34,12 @@ library
       src
   build-depends:
       base >=4.7 && <5
+    , containers
+    , fgl
+    , graphite
+    , graphviz
     , parsec
+    , text
   default-language: Haskell2010
 
 executable recumpose-exe
@@ -46,8 +51,13 @@ executable recumpose-exe
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , containers
+    , fgl
+    , graphite
+    , graphviz
     , parsec
     , recumpose
+    , text
   default-language: Haskell2010
 
 test-suite recumpose-test
@@ -60,6 +70,11 @@ test-suite recumpose-test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , containers
+    , fgl
+    , graphite
+    , graphviz
     , parsec
     , recumpose
+    , text
   default-language: Haskell2010

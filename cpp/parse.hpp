@@ -8,15 +8,11 @@
 #include <queue>
 #include <set>
 #include <cctype>
+#include <utility>
+#include "samples.hpp"
+#include "utils.hpp"
 
 using namespace std;
-
-auto source = R"V0G0N(
-k = 100 = l * 3
-x = 2
-y = 3
-b = 4
-)V0G0N";
 
 enum TYPE {
     LINE,
@@ -36,6 +32,9 @@ enum TYPE {
 const string Operators[] {
     "(" ,
     ")" ,
+
+    ":" ,
+    ";" ,
 
     "=" ,
 
@@ -60,6 +59,8 @@ const string Operators[] {
     "<=",
     ">=",
 
+    "inputs",
+    "outputs",
 };
 
 struct SourcePos {
@@ -356,19 +357,18 @@ void match_terms( Node * root ) {
             return true;
         
         int32_t seq_start = 0;
-        for ( size_t caret = 0; caret < line_node->content.size(); ++ caret ) {
-            const auto ch = line_node->content.at( caret );
+        for ( size_t caret = 0; caret <= line_node->content.size(); ++ caret ) {
             if (
-                ! isalnum( ch )
+                caret >= line_node->content.size()
                 ||
-                //check if not yet an operator:
+                ! isalnum( line_node->content.at( caret ) )
+                ||
+                //check that not yet an operator:
                 check_char(
                     root,
                     TYPE::OPERATOR,
                     line_node->source_pos.disp( caret, 1 )
                 )
-                ||
-                caret == line_node->content.size() - 1
             ) {
                 const auto length = caret - seq_start;
                 if ( length > 0 ) {
@@ -378,7 +378,7 @@ void match_terms( Node * root ) {
                         line_node->source_pos.disp( seq_start, length )
                     );
                     term_node->ref( line_node );
-                    cout << "Term " << term_node->content << " spawned at " << term_node->source_pos << endl;
+                    cout << "Term " << term_node->content << " spawned at " << term_node->source_pos << " with length " << length << endl;
                 }
                 seq_start = caret + 1;
             }
@@ -388,15 +388,67 @@ void match_terms( Node * root ) {
     pulse( root, on_line );
 }
 
+auto plot( Node * root ) {
+    set< pair< string, string > > nodes;
+    map< string, string > labels;
+
+    const auto & should_plot = []( Node * node ) {
+        switch ( node->type ) {
+            case TYPE::LINE:
+            case TYPE::TERM:
+            case TYPE::OPERATOR:
+                return true;
+            default:
+                return false;
+        }
+        return false;
+    };
+    const auto & name = [&]( Node * node ) {
+        return to_string( (uint64_t) (void const *) node );
+    };
+    const auto & label = [&]( Node * node ) {
+        switch ( node->type ) {
+            case TYPE::LINE:
+                return string( "line " ) + to_string( node->source_pos.line );
+            default:
+                return node->content;
+        }
+    };
+
+    const auto & on_node = [&]( Node * node ) {
+        if ( ! should_plot( node ) )
+            return true;
+        for ( const auto & ref : node->refs ) {
+            if ( should_plot( ref ) ) {
+                string first = name( node );
+                string second = name( ref );
+                if ( second < first )
+                    swap( first, second );
+                nodes.insert( make_pair(
+                    first,
+                    second
+                ) );
+
+                labels[ name( node ) ] = label( node );
+                labels[ name( ref ) ] = label( ref );
+            }
+        }
+        return true;
+    };
+    pulse( root, on_node );
+
+    plot_dot( nodes, labels );
+}
+
 auto parse()
 {
-    std::string input = source;
+    const auto input = PROGRAM_1;
     if ( input.size() <= 0 ) {
         cout << "Empty program source." << endl;
         return;
     }
     
-    cout << "Parsing the source:" << endl << source << endl;
+    cout << "Parsing the source:" << endl << input << endl;
     cout << "=======================================================" << endl;
     auto root = match_lines( input );
     print_lines( root );
@@ -405,6 +457,8 @@ auto parse()
     match_operators( root );
     fix_literal_ops( root );
     match_terms( root );
+
+    plot( root );
 
     cout << "Done." << endl;
 }

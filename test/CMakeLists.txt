@@ -7,7 +7,9 @@ target_include_directories( Catch INTERFACE ${CATCH_INCLUDE_DIR} )
 add_executable( tests test.cpp )
 target_link_libraries( tests PUBLIC Catch )
 
-enable_testing()
+if( TARGET tests )
+    enable_testing()
+endif()
 
 add_test( NAME tests COMMAND tests )
 

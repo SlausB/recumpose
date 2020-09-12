@@ -8,10 +8,11 @@ add_definitions(${GCC_COVERAGE_COMPILE_FLAGS})
 add_executable( recumpose cpp/main.cpp )
 target_link_libraries( recumpose common )
 
-add_subdirectory( test )
-
 add_library( common cpp/parse.hpp )
 set_target_properties( common PROPERTIES LINKER_LANGUAGE CXX )
+
+project(TEST)
+add_subdirectory(test)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})

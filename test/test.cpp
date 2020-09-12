@@ -6,24 +6,6 @@
 
 using namespace Catch;
 
-unsigned int Factorial( unsigned int number ) {
-    return number <= 1 ? number : Factorial(number-1)*number;
-}
-
-TEST_CASE( "Factorials are computed", "[factorial]" ) {
-    REQUIRE( Factorial(1) == 1 );
-    REQUIRE( Factorial(2) == 2 );
-    REQUIRE( Factorial(3) == 6 );
-    REQUIRE( Factorial(10) == 3628800 );
-}
-
-const string SIMPLE = R"V0G0N(
-k = 100 = l * 3
-x = 2
-y = 3
-b = 4
-)V0G0N";
-
 TEST_CASE( "Should match lines", "[match]" ) {
     auto root = match_lines( SIMPLE );
     match_operators( root );
@@ -41,5 +23,37 @@ TEST_CASE( "Should match lines", "[match]" ) {
 TEST_CASE( "Should match multiple operators within single line", "[match]" ) {
     auto root = match_lines( SIMPLE );
     match_operators( root );
+    Node * line = nullptr;
+    const auto & on_line = [&]( Node * node ) {
+        if ( node->type == TYPE::LINE && node->source_pos.line == 2 ) {
+            line = node;
+            return false;
+        }
+        return true;
+    };
+    pulse( root, on_line );
+    REQUIRE( line != nullptr );
+    set< int32_t > cols;
+    for ( const auto & ref : line->refs ) {
+        if ( ref->type == TYPE::OPERATOR )
+            cols.insert( ref->source_pos.char_start );
+    }
+    REQUIRE( cols.size() == 3 );
+}
+
+TEST_CASE( "Should parse terms last line symbols as well", "[match]" ) {
+    auto root = match_lines( PROGRAM_1 );
+    match_operators( root );
+    match_terms( root );
+    set< string > terms;
+    const auto & on_term = [&]( Node * node ) {
+        if ( node->type == TYPE::TERM )
+            terms.insert( node->content );
+        return true;
+    };
+    pulse( root, on_term );
+    REQUIRE( terms.contains( "345" ) );
+    REQUIRE( terms.contains( "12345" ) );
+    REQUIRE( terms.contains( "4" ) );
 }
 

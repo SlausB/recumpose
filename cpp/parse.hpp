@@ -7,11 +7,12 @@
 #include <list>
 #include <queue>
 #include <set>
+#include <cctype>
 
 using namespace std;
 
 auto source = R"V0G0N(
-k = 100
+k = 100 = l * 3
 x = 2
 y = 3
 b = 4
@@ -86,6 +87,8 @@ struct SourcePos {
             file
         );
     }
+
+    auto operator<=>(const SourcePos&) const = default;
 };
 ostream & operator <<( ostream & os, const SourcePos & s ) {
     os << '{' << s.line << ':' << s.char_start << '-' << s.char_end << '}';
@@ -105,6 +108,10 @@ struct Node {
         SourcePos source_pos
     ): content(content), type(type), source_pos(source_pos)
     {}
+    ~Node() {
+        for ( auto & ref : refs )
+            ref->refs.erase( this );
+    }
 
     void ref( Node * target ) {
         refs.insert( target );
@@ -226,25 +233,154 @@ void spawn_op_chars(
     }
 }
 
+bool try_match_operator(
+    Node * line_node,
+    const string & op,
+    size_t & caret
+) {
+    const auto r = line_node->content.find( op, caret );
+
+    if ( r == string::npos )
+        return false;
+    
+    auto op_node = new Node(
+        op,
+        TYPE::OPERATOR,
+        line_node->source_pos.disp( r, op.size() )
+    );
+    cout << "Operator found: " << op << " at " << op_node->source_pos << endl;
+    line_node->ref( op_node );
+    spawn_op_chars( op, op_node, line_node );
+    caret = r + op.size();
+    return true;
+}
+
 void match_operators( Node * root ) {
     const auto & on_line = []( Node * line_node ){
         if ( line_node->type != TYPE::LINE )
             return true;
         
-        for ( const auto & op : Operators ) {
-            const auto r = line_node->content.find( op );
-            if ( r == string::npos )
-                continue;
-            auto op_node = new Node(
-                op,
-                TYPE::OPERATOR,
-                line_node->source_pos.disp( r, op.size() )
-            );
-            cout << "Operator found: " << op << " at " << op_node->source_pos << endl;
-            line_node->ref( op_node );
-            spawn_op_chars( op, op_node, line_node );
+        size_t caret = 0;
+        while ( caret < line_node->content.size() ) {
+            bool found = false;
+            for ( const auto & op : Operators ) {
+                while ( caret < line_node->content.size() ) {
+                    found = try_match_operator( line_node, op, caret );
+                    if ( ! found )
+                        break;
+                }
+            }
+            if ( ! found )
+                break;
         }
 
+        return true;
+    };
+    pulse( root, on_line );
+}
+
+/** Remove operators which consist of literals (like "if","then"...) and are parts of terms.*/
+void fix_literal_ops( Node * root ) {
+    set< Node * > remove;
+
+    const auto & on_op = [&]( Node * op_node ) {
+        if ( op_node->type != TYPE::OPERATOR )
+            return true;
+        
+        auto line_node = closest( op_node, TYPE::LINE );
+        if ( line_node == nullptr )
+            return true;
+        
+        for ( const auto ch : op_node->content ) {
+            if ( ! isalpha( ch ) )
+                return true;
+        }
+        
+        if (
+            //at left:
+            (
+                op_node->source_pos.char_start > line_node->source_pos.char_start
+                &&
+                isalpha( line_node->content.at( op_node->source_pos.char_start - 1 ) )
+            )
+            ||
+            //at right:
+            (
+                op_node->source_pos.char_end < line_node->source_pos.char_end
+                &&
+                isalpha( line_node->content.at( op_node->source_pos.char_end ) )
+            )
+        ) {
+            remove.insert( op_node );
+        }
+
+        return true;
+    };
+    pulse( root, on_op );
+
+    for ( auto & r : remove )
+        delete r;
+    cout << remove.size() << " literals Operators fixed back to become terms." << endl;
+}
+
+/** Returns true if character participates in Node of specified TYPE.*/
+bool check_char(
+    Node * root,
+    const TYPE type,
+    const SourcePos & source_pos
+) {
+    bool does = false;
+    const auto & on_char = [&]( Node * char_node ) {
+        if ( char_node->type != TYPE::CHAR )
+            return true;
+        if ( char_node->source_pos == source_pos ) {
+            for ( const auto & ref : char_node->refs ) {
+                if ( ref->type == type ) {
+                    does = true;
+                    return false;
+                }
+            }
+            return false;
+        }
+        return true;
+    };
+    pulse( root, on_char );
+    return does;
+}
+
+void match_terms( Node * root ) {
+    const auto & on_line = [&]( Node * line_node ) {
+        if ( line_node->type != TYPE::LINE )
+            return true;
+        
+        int32_t seq_start = 0;
+        for ( size_t caret = 0; caret < line_node->content.size(); ++ caret ) {
+            const auto ch = line_node->content.at( caret );
+            if (
+                ! isalnum( ch )
+                ||
+                //check if not yet an operator:
+                check_char(
+                    root,
+                    TYPE::OPERATOR,
+                    line_node->source_pos.disp( caret, 1 )
+                )
+                ||
+                caret == line_node->content.size() - 1
+            ) {
+                const auto length = caret - seq_start;
+                if ( length > 0 ) {
+                    auto term_node = new Node(
+                        line_node->content.substr( seq_start, length ),
+                        TYPE::TERM,
+                        line_node->source_pos.disp( seq_start, length )
+                    );
+                    term_node->ref( line_node );
+                    cout << "Term " << term_node->content << " spawned at " << term_node->source_pos << endl;
+                }
+                seq_start = caret + 1;
+            }
+        }
         return true;
     };
     pulse( root, on_line );
@@ -265,7 +401,8 @@ auto parse()
     cout << "=======================================================" << endl;
 
     match_operators( root );
-
+    fix_literal_ops( root );
+    match_terms( root );
 
     cout << "Done." << endl;
 }

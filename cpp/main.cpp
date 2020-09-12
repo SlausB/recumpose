@@ -44,3 +44,5 @@ a ∘+ g + 1
 */
 
 //when function (program/endity/...) is composed on top of itself, it means at least that it takes the same type as it returns (where type is the space and values are points in that space). But the result of such composition is the different type ofc. Implementation of computation on top of that composition (on top of expression of composition) spawns new instance of type (where it's called "value") and instance is the same on the left side of composition and the right side of composion (same besides having just similar value). Thus, the moment of such instantiation requires permorming the branching of the whole composition graph.
+
+//one might consider this language as detangling of problem graph into physical machine memory (which programmer always has to manage)

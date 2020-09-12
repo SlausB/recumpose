@@ -83,7 +83,7 @@ struct SourcePos {
         return SourcePos(
             line,
             char_start + disp,
-            char_start + disp + length,
+            char_start + disp + length - 1,
             file
         );
     }

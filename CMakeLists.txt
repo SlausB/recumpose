@@ -12,7 +12,7 @@ add_library( common cpp/parse.hpp )
 set_target_properties( common PROPERTIES LINKER_LANGUAGE CXX )
 
 project(TEST)
-add_subdirectory(test)
+add_subdirectory( test EXCLUDE_FROM_ALL )
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})

@@ -110,18 +110,12 @@ void match_operators( Node * root ) {
         if ( line_node->type != TYPE::LINE )
             return true;
         
-        size_t caret = 0;
-        while ( caret < line_node->content.size() ) {
-            bool found = false;
-            for ( const auto & op : Operators ) {
-                while ( caret < line_node->content.size() ) {
-                    found = try_match_operator( line_node, op, caret );
-                    if ( ! found )
-                        break;
-                }
+        for ( const auto & op : Operators ) {
+            size_t caret = 0;
+            while ( caret < line_node->content.size() ) {
+                if ( ! try_match_operator( line_node, op, caret ) )
+                    break;
             }
-            if ( ! found )
-                break;
         }
 
         return true;

@@ -225,9 +225,61 @@ auto match_symmetries( Node * root ) {
             }
         }
         sorted.sort();
-        cout << "Line " << line_node->source_pos.line << " has this these TERMs and OPERATORs refs: " << endl;
+
+        cout << "Line " << line_node->source_pos.line << " has these TERMs and OPERATORs refs: " << endl;
         for ( const auto & h : sorted )
             cout << "    " << h.node->content << endl;
+        
+        list< list< Node * > > expressions;
+        set< Node * > equality_nodes;
+        {
+            list< Node * > building_expr;
+            for ( auto & h : sorted ) {
+                if ( h.node->type == TYPE::OPERATOR && h.node->content == "=" ) {
+                    expressions.push_back( building_expr );
+                    building_expr.clear();
+
+                    auto equality_node = new Node(
+                        "=",
+                        TYPE::EQUALITY,
+                        h.node->source_pos
+                    );
+                    equality_nodes.insert( equality_node );
+                    equality_node->ref( line_node );
+                }
+                else {
+                    building_expr.push_back( h.node );
+                }
+            }
+            expressions.push_back( building_expr );
+        }
+        for ( auto & es : expressions ) {
+            if ( es.size() < 1 ) {
+                cout << "ERROR: expected expressions around \"=\" operator." << endl;
+            }
+            else {
+                auto expr_node = new Node(
+                    "",
+                    TYPE::EXPRESSION,
+                    line_node->source_pos
+                );
+                expr_node->source_pos.char_start = es.front()->source_pos.char_start;
+                expr_node->source_pos.char_start = es.back() ->source_pos.char_end;
+                bool first = true;
+                for ( const auto & e : es ) {
+                    if ( ! first )
+                        expr_node->content += " ";
+                    first = false;
+                    expr_node->content += e->content;
+                    expr_node->ref( e );
+                }
+                expr_node->ref( line_node );
+
+                for ( auto & eq_node : equality_nodes )
+                    expr_node->ref( eq_node );
+            }
+        }
+
         return true;
     };
     pulse( root, on_equal );
@@ -242,6 +294,22 @@ auto parse_source( const auto & input ) {
     return root;
 }
 
+auto print_symmetries( Node * root ) {
+    const auto & on_sym = [&]( Node * sym_node ) {
+        if ( sym_node->type != TYPE::EQUALITY )
+            return true;
+        
+        auto line_node = closest( sym_node, TYPE::LINE );
+        cout << "Line " << line_node->source_pos.line << " has such symmetries:" << endl;
+        for ( const auto & ref : sym_node->refs ) {
+            if ( ref->type == TYPE::EXPRESSION )
+                cout << "    " << ref->content << endl;
+        }
+        return true;
+    };
+    pulse( root, on_sym );
+}
+
 auto parse()
 {
     const auto input = PROGRAM_1;
@@ -252,6 +320,8 @@ auto parse()
     
     cout << "Parsing the source:" << endl << input << endl;
     auto root = parse_source( input );
+
+    print_symmetries( root );
 
     plot( root );
 

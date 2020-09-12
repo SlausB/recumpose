@@ -24,7 +24,9 @@ enum TYPE {
     PARENTH_BLOCK,
 
     EQUALITY,
+    //the sophisticated (recursive?) one, not just regular function composition; regular one refers to EXPRESSION:
     COMPOSITION,
+    EXPRESSION,
 };
 
 /** Matching is performed in order.*/

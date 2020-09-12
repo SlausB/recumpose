@@ -160,6 +160,8 @@ Node * closest( Node * center, const TYPE type ) {
 void print_lines( Node * root ) {
     cout << "Source split into lines:" << endl;
     const auto & print = []( Node * node ) {
+        if ( node->type != TYPE::LINE )
+            return true;
         cout << "    " << node->source_pos.line << ": chars " << node->source_pos.char_start << "-" << node->source_pos.char_end << ": " << node->content << endl;
         return true;
     };

@@ -19,6 +19,7 @@ b = 4
 
 enum TYPE {
     LINE,
+    CHAR,
 
     TERM,
 
@@ -30,7 +31,11 @@ enum TYPE {
     COMPOSITION,
 };
 
-const auto Operators = {
+/** Matching is performed in order.*/
+const string Operators[] {
+    "(" ,
+    ")" ,
+
     "=" ,
 
     "->",
@@ -44,9 +49,6 @@ const auto Operators = {
     "∘" ,
     "∘=",
     "∘+",
-
-    "(" ,
-    ")" ,
 
     "if",
     "then",
@@ -71,20 +73,31 @@ struct SourcePos {
         const auto & line,
         const auto & char_start,
         const auto & char_end,
-        const string file = "",
+        const string file = ""
     ): line(line), char_start(char_start), char_end(char_end), file(file)
     {}
+
+    /** Calculate child SourcePos at specified displacement and length.*/
+    SourcePos disp( const int32_t disp, const int32_t length ) {
+        return SourcePos(
+            line,
+            char_start + disp,
+            char_start + disp + length,
+            file
+        );
+    }
 };
+ostream & operator <<( ostream & os, const SourcePos & s ) {
+    os << '{' << s.line << ':' << s.char_start << '-' << s.char_end << '}';
+    return os;
+}
 
 struct Node {
     string content;
-
+    TYPE type;
+    SourcePos source_pos;
     /** References are always bidirectional because one might use SourcePos to reason about ordering.*/
     set< Node * > refs;
-
-    TYPE type;
-
-    SourcePos source_pos;
 
     Node(
         const auto & content,
@@ -99,7 +112,8 @@ struct Node {
     }
 };
 
-void depth_first( Node * root, const auto & on_node ) {
+/** Breadth first iteration over AST.*/
+void pulse( Node * root, const auto & on_node ) {
     set< Node * > visited;
     visited.insert( root );
 
@@ -122,6 +136,19 @@ void depth_first( Node * root, const auto & on_node ) {
         }
     }
 }
+/** Returns first occurence of Node with specified TYPE around center Node or nullptr.*/
+Node * closest( Node * center, const TYPE type ) {
+    Node * result = nullptr;
+    const auto & on_node = [&]( Node * node ) {
+        if ( node->type == type ) {
+            result = node;
+            return false;
+        }
+        return true;
+    };
+    pulse( center, on_node );
+    return result;
+}
 
 void print_lines( Node * root ) {
     cout << "Source split into lines:" << endl;
@@ -129,7 +156,7 @@ void print_lines( Node * root ) {
         cout << "    " << node->source_pos.line << ": chars " << node->source_pos.char_start << "-" << node->source_pos.char_end << ": " << node->content << endl;
         return true;
     };
-    depth_first( root, print );
+    pulse( root, print );
 }
 
 Node * match_lines( const auto & input ) {
@@ -180,12 +207,47 @@ Node * match_lines( const auto & input ) {
     return start;
 }
 
-void match_parenth( Node * root ) {
-    //TODO:
+/** Spawn CHAR Nodes for every character of specified Operator and connect it with both OPERATOR and LINE Nodes.*/
+void spawn_op_chars(
+    const auto & op,
+    Node * op_node,
+    Node * line_node
+) {
+    int32_t disp = 0;
+    for ( char ch : op ) {
+        auto ch_node = new Node(
+            string( 1, ch ),
+            TYPE::CHAR,
+            op_node->source_pos.disp( disp, 1 )
+        );
+        op_node->ref( ch_node );
+        line_node->ref( ch_node );
+        ++ disp;
+    }
 }
 
 void match_operators( Node * root ) {
+    const auto & on_line = []( Node * line_node ){
+        if ( line_node->type != TYPE::LINE )
+            return true;
+        
+        for ( const auto & op : Operators ) {
+            const auto r = line_node->content.find( op );
+            if ( r == string::npos )
+                continue;
+            auto op_node = new Node(
+                op,
+                TYPE::OPERATOR,
+                line_node->source_pos.disp( r, op.size() )
+            );
+            cout << "Operator found: " << op << " at " << op_node->source_pos << endl;
+            line_node->ref( op_node );
+            spawn_op_chars( op, op_node, line_node );
+        }
 
+        return true;
+    };
+    pulse( root, on_line );
 }
 
 auto parse()
@@ -202,7 +264,7 @@ auto parse()
     print_lines( root );
     cout << "=======================================================" << endl;
 
-    match_parenth( root );
+    match_operators( root );
 
 
     cout << "Done." << endl;

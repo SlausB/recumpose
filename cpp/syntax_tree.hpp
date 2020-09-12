@@ -63,19 +63,19 @@ const string Operators[] {
 };
 
 struct SourcePos {
+    string file;
     /** Starts from 1 as it is in text editors.*/
     int32_t line;
     /** Which characters this node spans within source. Starts from 1 as it is in text editors.*/
     int32_t char_start;
     int32_t char_end;
-    string file;
 
     SourcePos(
         const auto & line,
         const auto & char_start,
         const auto & char_end,
         const string file = ""
-    ): line(line), char_start(char_start), char_end(char_end), file(file)
+    ): file(file), line(line), char_start(char_start), char_end(char_end)
     {}
 
     /** Calculate child SourcePos at specified displacement and length.*/
@@ -118,6 +118,14 @@ struct Node {
         target->refs.insert( this );
     }
 };
+/** Used to reason about nodes relative positioning in line.*/
+struct NodeHandler {
+    Node * node;
+    NodeHandler( Node * node ): node(node) {}
+    bool operator < ( const NodeHandler & n ) const {
+        return node->source_pos < n.node->source_pos;
+    }
+};
 
 /** Breadth first iteration over AST.*/
 void pulse( Node * root, const auto & on_node ) {
@@ -156,3 +164,43 @@ Node * closest( Node * center, const TYPE type ) {
     pulse( center, on_node );
     return result;
 }
+
+void print_lines( Node * root ) {
+    cout << "Source split into lines:" << endl;
+    const auto & print = []( Node * node ) {
+        if ( node->type != TYPE::LINE )
+            return true;
+        cout << "    " << node->source_pos.line << ": chars " << node->source_pos.char_start << "-" << node->source_pos.char_end << ": " << node->content << endl;
+        return true;
+    };
+    pulse( root, print );
+}
+
+/** Returns true if character participates in Node of specified TYPE.*/
+bool check_char(
+    Node * root,
+    const TYPE type,
+    const SourcePos & source_pos
+) {
+    bool does = false;
+    const auto & on_char = [&]( Node * char_node ) {
+        if ( char_node->type != TYPE::CHAR )
+            return true;
+        if ( char_node->source_pos == source_pos ) {
+            for ( const auto & ref : char_node->refs ) {
+                if ( ref->type == type ) {
+                    does = true;
+                    return false;
+                }
+            }
+            return false;
+        }
+        return true;
+    };
+    pulse( root, on_char );
+    return does;
+}
+
+
+
+

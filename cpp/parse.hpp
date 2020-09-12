@@ -9,22 +9,12 @@
 #include <set>
 #include <cctype>
 #include <utility>
+#include <algorithm>
 #include "samples.hpp"
 #include "syntax_tree.hpp"
 #include "plot.hpp"
 
 using namespace std;
-
-void print_lines( Node * root ) {
-    cout << "Source split into lines:" << endl;
-    const auto & print = []( Node * node ) {
-        if ( node->type != TYPE::LINE )
-            return true;
-        cout << "    " << node->source_pos.line << ": chars " << node->source_pos.char_start << "-" << node->source_pos.char_end << ": " << node->content << endl;
-        return true;
-    };
-    pulse( root, print );
-}
 
 Node * match_lines( const auto & input ) {
     Node * start = nullptr;
@@ -183,31 +173,6 @@ void fix_literal_ops( Node * root ) {
     cout << remove.size() << " literals Operators fixed back to become terms." << endl;
 }
 
-/** Returns true if character participates in Node of specified TYPE.*/
-bool check_char(
-    Node * root,
-    const TYPE type,
-    const SourcePos & source_pos
-) {
-    bool does = false;
-    const auto & on_char = [&]( Node * char_node ) {
-        if ( char_node->type != TYPE::CHAR )
-            return true;
-        if ( char_node->source_pos == source_pos ) {
-            for ( const auto & ref : char_node->refs ) {
-                if ( ref->type == type ) {
-                    does = true;
-                    return false;
-                }
-            }
-            return false;
-        }
-        return true;
-    };
-    pulse( root, on_char );
-    return does;
-}
-
 void match_terms( Node * root ) {
     const auto & on_line = [&]( Node * line_node ) {
         if ( line_node->type != TYPE::LINE )
@@ -245,11 +210,41 @@ void match_terms( Node * root ) {
     pulse( root, on_line );
 }
 
+auto match_symmetries( Node * root ) {
+    const auto & on_equal = [&]( Node * eq_node ) {
+        if ( eq_node->type != TYPE::OPERATOR || eq_node->content != "=" )
+            return true;
+        
+        auto line_node = closest( eq_node, TYPE::LINE );
+        if ( line_node == nullptr )
+            throw runtime_error( "Equal operator without line" );
+        
+        list< NodeHandler > sorted;
+        for ( const auto & ref : line_node->refs ) {
+            switch ( ref->type ) {
+                case TYPE::TERM:
+                case TYPE::OPERATOR:
+                    sorted.push_back( NodeHandler( ref ) );
+                    break;
+                default:
+                    break;
+            }
+        }
+        sorted.sort();
+        cout << "Line " << line_node->source_pos.line << " has this these TERMs and OPERATORs refs: " << endl;
+        for ( const auto & h : sorted )
+            cout << "    " << h.node->content << endl;
+        return true;
+    };
+    pulse( root, on_equal );
+}
+
 auto parse_source( const auto & input ) {
     auto root = match_lines( input );
     match_operators( root );
     fix_literal_ops( root );
     match_terms( root );
+    match_symmetries( root );
     return root;
 }
 

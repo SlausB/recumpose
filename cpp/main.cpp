@@ -5,12 +5,7 @@
 
 using namespace std;
 
-/** Compiling strictly typed non-deterministic programming language based on lambda-calculus, reactive programming, type theory and fractal growth to easily handle composition.*/
-
-struct Node {
-    list< Node * > refs;
-    list< Node * > refd;
-};
+/** Compiled strictly typed non-deterministic programming language based on lambda-calculus, reactive programming, type theory and fractal growth to easily handle composition.*/
 
 /** The whole execution/data (remember code-data equivalence) model takes shape of bidirectional graph (actually probably the most abstract data structure you can't even reason about).*/
 struct Graph {

@@ -1,0 +1,4 @@
+
+inputs: x
+symmetric = some * 345 = 12345
+  some = x * 4

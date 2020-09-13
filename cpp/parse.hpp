@@ -1,6 +1,8 @@
 
 #include <iomanip>
 #include <iostream>
+#include <fstream>
+#include <string>
 #include <map>
 #include <memory>
 #include <stdexcept>
@@ -10,55 +12,53 @@
 #include <cctype>
 #include <utility>
 #include <algorithm>
-#include "samples.hpp"
 #include "syntax_tree.hpp"
 #include "plot.hpp"
 
 using namespace std;
 
-Node * match_lines( const auto & input ) {
+bool only_whitespace( const string & line ) {
+    for ( const auto & ch : line ) {
+        if ( ! isspace( ch ) )
+            return false;
+    }
+    return true;
+}
+
+Node * parse_lines( const string & file_name ) {
     Node * start = nullptr;
     //currently matching:
     Node * last = nullptr;
 
-    //first break into lines:
-    int32_t line_number = 1;
-    int32_t line_char_number = 0;
-    int32_t line_start = 0;
-    int32_t cur_pos = 0;
-    auto caret = input.begin();
-    while ( caret != input.end() ) {
-        if ( * caret == '\n' ) {
-            //line with some content:
-            if ( cur_pos - line_start > 0 ) {
-                //append new semantic node which represents the parsed line:
-                auto new_one = new Node(
-                    input.substr( line_start, cur_pos - line_start ),
-                    TYPE::LINE,
-                    SourcePos(
-                        line_number,
-                        1,
-                        //-1 because chars (col) counting in text editors starts from 1 instead of 0 :(
-                        line_char_number - 1
-                    )
-                );
-                if ( start == nullptr ) {
-                    start = new_one;
-                    last = new_one;
-                }
-                else {
-                    last->ref( new_one );
-                    last = new_one;
-                }
-            }
-            line_start = cur_pos + 1;
-            line_char_number = 0;
-            ++ line_number;
-        }
+    ifstream file( file_name );
 
-        ++ caret;
-        ++ cur_pos;
-        ++ line_char_number;
+    int32_t line_number = 0;
+    string line;
+    while ( getline( file, line ) ) {
+        ++ line_number;
+
+        if ( only_whitespace( line ) )
+            continue;
+
+        auto new_one = new Node(
+            line,
+            TYPE::LINE,
+            SourcePos(
+                line_number,
+                1,
+                line.size(),
+                file_name
+            )
+        );
+
+        if ( start == nullptr ) {
+            start = new_one;
+            last = new_one;
+        }
+        else {
+            last->ref( new_one );
+            last = new_one;
+        }
     }
 
     return start;
@@ -285,8 +285,8 @@ auto match_symmetries( Node * root ) {
     pulse( root, on_equal );
 }
 
-auto parse_source( const auto & input ) {
-    auto root = match_lines( input );
+auto parse_source( const string & file_name ) {
+    auto root = parse_lines( file_name );
     match_operators( root );
     fix_literal_ops( root );
     match_terms( root );
@@ -310,16 +310,24 @@ auto print_symmetries( Node * root ) {
     pulse( root, on_sym );
 }
 
-auto parse()
-{
-    const auto input = PROGRAM_1;
-    if ( input.size() <= 0 ) {
-        cout << "Empty program source." << endl;
-        return;
+void print_file( const string & file_name ) {
+    ifstream file( file_name );
+    cout << "Source \"" << file_name << "\" input file:" << endl;
+    cout << "================================================" << endl;
+    string line;
+    int32_t line_number = 0;
+    while ( getline( file, line ) ) {
+        ++ line_number;
+        cout << "Line " << line_number << ": \"" << line << "\"" << endl;
     }
-    
-    cout << "Parsing the source:" << endl << input << endl;
-    auto root = parse_source( input );
+    cout << "================================================" << endl;
+}
+
+auto parse( const string & file_name )
+{
+    print_file( file_name );
+    auto root = parse_source( file_name );
+    print_lines( root );
 
     print_symmetries( root );
 

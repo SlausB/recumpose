@@ -21,7 +21,7 @@ struct Entity {
 };
 
 int main() {
-    parse();
+    parse( "../samples/program_1.rcl" );
     //parse_ast();
 
     //pulse_ast_with_numbered_waves_by_composing_layered_waves_on_entities();

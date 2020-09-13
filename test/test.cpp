@@ -7,9 +7,8 @@
 using namespace Catch;
 
 TEST_CASE( "Should match lines", "[match]" ) {
-    auto root = match_lines( SIMPLE );
-    match_operators( root );
-    print_lines( root );
+    auto root = parse_source( "../samples/simple.rcl" );
+    REQUIRE( root != nullptr );
     int32_t lines_count = 0;
     const auto & on_node = [&]( auto node ) {
         if ( node->type == TYPE::LINE )
@@ -21,8 +20,8 @@ TEST_CASE( "Should match lines", "[match]" ) {
 }
 
 TEST_CASE( "Should match multiple operators within single line", "[match]" ) {
-    auto root = match_lines( SIMPLE );
-    match_operators( root );
+    auto root = parse_source( "../samples/simple.rcl" );
+    REQUIRE( root != nullptr );
     Node * line = nullptr;
     const auto & on_line = [&]( Node * node ) {
         if ( node->type == TYPE::LINE && node->source_pos.line == 2 ) {
@@ -42,9 +41,8 @@ TEST_CASE( "Should match multiple operators within single line", "[match]" ) {
 }
 
 TEST_CASE( "Should parse terms last line symbols as well", "[match]" ) {
-    auto root = match_lines( PROGRAM_1 );
-    match_operators( root );
-    match_terms( root );
+    auto root = parse_source( "../samples/program_1.rcl" );
+    REQUIRE( root != nullptr );
     set< string > terms;
     const auto & on_term = [&]( Node * node ) {
         if ( node->type == TYPE::TERM )

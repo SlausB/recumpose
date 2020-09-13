@@ -287,6 +287,10 @@ auto match_symmetries( Node * root ) {
 
 auto parse_source( const string & file_name ) {
     auto root = parse_lines( file_name );
+    if ( root == nullptr ) {
+        cout << "ERROR: empty source." << endl;
+        return root;
+    }
     match_operators( root );
     fix_literal_ops( root );
     match_terms( root );
@@ -327,6 +331,8 @@ auto parse( const string & file_name )
 {
     print_file( file_name );
     auto root = parse_source( file_name );
+    if ( root == nullptr )
+        return;
     print_lines( root );
 
     print_symmetries( root );

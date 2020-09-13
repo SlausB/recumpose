@@ -52,6 +52,9 @@ const string Operators[] {
     "∘" ,
     "∘=",
     "∘+",
+    "@" ,
+    "@=",
+    "@+",
 
     "if",
     "then",
@@ -121,9 +124,18 @@ struct Node {
             red->refs.erase( this );
     }
 
+    /** Make this Node reference other specified Node.*/
     void ref( Node * target ) {
         refs.insert( target );
         target->refd.insert( this );
+    }
+    /** Returns first occurence of Node with specified TYPE which references this Node.*/
+    Node * parent( const TYPE type ) {
+        for ( auto & parent : refd ) {
+            if ( parent->type == type )
+                return parent;
+        }
+        return nullptr;
     }
 };
 /** Used to reason about nodes relative positioning in line.*/

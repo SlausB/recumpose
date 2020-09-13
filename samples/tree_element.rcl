@@ -1,0 +1,7 @@
+
+/** Some entity which does some stuff, but additionally is an element of a tree.*/
+
+some:
+    blabla
+
+some ∘+ tree_element

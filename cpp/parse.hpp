@@ -193,7 +193,7 @@ void match_terms( Node * root ) {
                         TYPE::TERM,
                         line_node->source_pos.disp( seq_start, length )
                     );
-                    term_node->ref( line_node );
+                    line_node->ref( term_node );
                     cout << "Term " << term_node->content << " spawned at " << term_node->source_pos << " with length " << length << endl;
                 }
                 seq_start = caret + 1;
@@ -245,7 +245,7 @@ auto match_symmetries( Node * root ) {
                         h.node->source_pos
                     );
                     equality_nodes.insert( equality_node );
-                    equality_node->ref( line_node );
+                    line_node->ref( equality_node );
                 }
                 else {
                     building_expr.push_back( h.node );
@@ -273,7 +273,7 @@ auto match_symmetries( Node * root ) {
                     expr_node->content += e->content;
                     expr_node->ref( e );
                 }
-                expr_node->ref( line_node );
+                line_node->ref( expr_node );
 
                 for ( auto & eq_node : equality_nodes )
                     expr_node->ref( eq_node );

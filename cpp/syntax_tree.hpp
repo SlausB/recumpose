@@ -27,6 +27,8 @@ enum TYPE {
     //the sophisticated (recursive?) one, not just regular function composition; regular one refers to EXPRESSION:
     COMPOSITION,
     EXPRESSION,
+    /** Something just named having a bunch of compositions in it. Adds it's compositions into program immunity and can be composed on top as well.*/
+    ENTITY,
 };
 
 /** Matching is performed in order.*/
@@ -101,8 +103,10 @@ struct Node {
     string content;
     TYPE type;
     SourcePos source_pos;
-    /** References are always bidirectional because one might use SourcePos to reason about ordering.*/
+    /** Which other nodes this one references.*/
     set< Node * > refs;
+    /** Which other nodes reference this one.*/
+    set< Node * > refd;
 
     Node(
         const auto & content,
@@ -112,12 +116,14 @@ struct Node {
     {}
     ~Node() {
         for ( auto & ref : refs )
-            ref->refs.erase( this );
+            ref->refd.erase( this );
+        for ( auto & red : refd )
+            red->refs.erase( this );
     }
 
     void ref( Node * target ) {
         refs.insert( target );
-        target->refs.insert( this );
+        target->refd.insert( this );
     }
 };
 /** Used to reason about nodes relative positioning in line.*/
@@ -145,12 +151,16 @@ void pulse( Node * root, const auto & on_node ) {
         if ( ! on_node( node ) )
             return;
         
-        //visit it's children later on:
-        for ( auto next : node->refs ) {
-            //... only if wasn't visited already:
-            if ( visited.insert( next ).second )
-                to_visit.insert( next );
-        }
+        const auto & visit = [&]( set< Node * > & array ) {
+            //visit adjacents later on:
+            for ( auto next : array ) {
+                //... only if wasn't visited already:
+                if ( visited.insert( next ).second )
+                    to_visit.insert( next );
+            }
+        };
+        visit( node->refs );
+        visit( node->refd );
     }
 }
 /** Returns first occurence of Node with specified TYPE around center Node or nullptr.*/
@@ -189,8 +199,8 @@ bool check_char(
         if ( char_node->type != TYPE::CHAR )
             return true;
         if ( char_node->source_pos == source_pos ) {
-            for ( const auto & ref : char_node->refs ) {
-                if ( ref->type == type ) {
+            for ( const auto & red : char_node->refd ) {
+                if ( red->type == type ) {
                     does = true;
                     return false;
                 }

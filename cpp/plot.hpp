@@ -7,32 +7,52 @@
 #include <cstdlib>
 using namespace std;
 
-/** Bidirectional (undirected) graphs.*/
-void plot_dot(
-    const set< pair< string, string > > & nodes,
-    const map< string, string > & labels = map< string, string >(),
-    const string & file_name = string( "graph.dot" ),
-    const string & graph_name = string( "recumpose" )
-) {
+/** DOT language output utility.*/
+struct Plot {
+    enum TYPE {
+        UNDIRECTED,
+        DIRECTED,
+    };
+    TYPE type;
+
     ofstream o;
-    o.open( file_name );
+    string file_name;
+    string graph_name;
 
-    o << "graph " << graph_name << " {" << endl;
-    for ( const auto & l : labels ) {
-        o << "    " << l.first << " [label=\"" << l.second << "\"];" << endl;
+    Plot(
+        TYPE type = TYPE::DIRECTED,
+        const string & file_name = string( "graph.dot" ),
+        const string & graph_name = string( "recumpose" )
+    ): type(type), file_name(file_name), graph_name(graph_name)  {
+        o.open( file_name );
+        o << ( type == TYPE::DIRECTED ? "digraph " : "graph " ) << graph_name << " {" << endl;
     }
-    for ( const auto & n : nodes ) {
-        o << "    " << n.first << " -- " << n.second << ";" << endl;
-    }
-    o << "}" << endl;
 
-    const string command = string( "neato -Tpng " ) + file_name + " -o " + graph_name + ".png";
-    system( command.c_str() );
-}
+    void relation( const auto & from, const auto & to ) {
+        o << "    " << from << f() << to << ";" << endl;
+    }
+    /** Redefine displayed name of id node.*/
+    void label( const auto & id, const auto & name ) {
+        o << "    " << id << " [label=\"" << name << "\"];" << endl;
+    }
+
+    ~Plot() {
+        o << "}" << endl;
+        const string command = string( "dot -Tpng " ) + file_name + " -o " + graph_name + ".png";
+        system( command.c_str() );
+    }
+    auto f() {
+        return type == TYPE::DIRECTED ? " -> " : " -- ";
+    }
+};
+
+auto name( Node * node ) {
+    return (uint64_t) (void const *) node;
+};
 
 auto plot( Node * root ) {
-    set< pair< string, string > > nodes;
-    map< string, string > labels;
+    Plot p;
+    map< uint64_t, string > labels;
 
     const auto & should_plot = []( Node * node ) {
         switch ( node->type ) {
@@ -44,9 +64,6 @@ auto plot( Node * root ) {
                 return false;
         }
         return false;
-    };
-    const auto & name = [&]( Node * node ) {
-        return to_string( (uint64_t) (void const *) node );
     };
     const auto & label = [&]( Node * node ) {
         switch ( node->type ) {
@@ -62,23 +79,18 @@ auto plot( Node * root ) {
             return true;
         for ( const auto & ref : node->refs ) {
             if ( should_plot( ref ) ) {
-                string first = name( node );
-                string second = name( ref );
-                if ( second < first )
-                    swap( first, second );
-                nodes.insert( make_pair(
-                    first,
-                    second
-                ) );
-
+                p.relation( name( node ), name( ref ) );
+                
                 labels[ name( node ) ] = label( node );
-                labels[ name( ref ) ] = label( ref );
+                labels[ name( ref  ) ] = label( ref  );
             }
         }
         return true;
     };
     pulse( root, on_node );
 
-    plot_dot( nodes, labels );
+    for ( const auto & label : labels ) {
+        p.label( label.first, label.second );
+    }
 }
 

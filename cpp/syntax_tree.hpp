@@ -14,6 +14,7 @@
 using namespace std;
 
 enum TYPE {
+    SOURCE_FILE,
     LINE,
     CHAR,
 
@@ -130,10 +131,26 @@ struct Node {
         target->refd.insert( this );
     }
     /** Returns first occurence of Node with specified TYPE which references this Node.*/
-    Node * parent( const TYPE type ) {
+    Node * parent( const TYPE & type ) {
         for ( auto & parent : refd ) {
             if ( parent->type == type )
                 return parent;
+        }
+        return nullptr;
+    }
+    Node * parent( const auto & types ) {
+        for ( auto & parent : refd ) {
+            for ( const auto & type : types )
+                if ( parent->type == type )
+                    return parent;
+        }
+        return nullptr;
+    }
+    /** Returns first occurense of Node with specified TYPE which current Node references.*/
+    Node * child( const TYPE & type ) {
+        for ( auto & child : refs ) {
+            if ( child->type == type )
+                return child;
         }
         return nullptr;
     }

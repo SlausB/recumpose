@@ -55,3 +55,16 @@ TEST_CASE( "Should parse terms last line symbols as well", "[match]" ) {
     REQUIRE( terms.contains( "4" ) );
 }
 
+TEST_CASE( "Properly match single line comment", "[comment]" ) {
+
+}
+TEST_CASE( "Properly match multi line comment", "[comment]" ) {
+
+}
+TEST_CASE( "Single line comment after multiline on same line", "[comment]" ) {
+
+}
+TEST_CASE( "Short multi line comment after single line one", "[comment]" ) {
+    
+}
+

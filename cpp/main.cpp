@@ -15,7 +15,8 @@ These entities are like reactive outputs: only resulting value on single entity 
 struct Entity {};
 
 int main() {
-    parse( "../samples/program_1.rcl" );
+    //parse( "../samples/program_1.rcl" );
+    parse( "../samples/falcon.rcl" );
     //pulse_ast_with_numbered_waves_by_composing_layered_waves_on_entities();
 
     //every composition needs to be reversible (so to define sqrt() function you'll have to define complex numbers and thus recompose (+),(-),(*), etc)

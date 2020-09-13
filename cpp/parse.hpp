@@ -26,11 +26,16 @@ bool only_whitespace( const string & line ) {
 }
 
 Node * parse_lines( const string & file_name ) {
-    Node * start = nullptr;
-    //currently matching:
-    Node * last = nullptr;
-
     ifstream file( file_name );
+
+    auto file_node = new Node(
+        "",
+        TYPE::SOURCE_FILE,
+        SourcePos( 0, 0, 0, file_name )
+    );
+
+    //chaining:
+    auto node = file_node;
 
     int32_t line_number = 0;
     string line;
@@ -50,18 +55,100 @@ Node * parse_lines( const string & file_name ) {
                 file_name
             )
         );
-
-        if ( start == nullptr ) {
-            start = new_one;
-            last = new_one;
-        }
-        else {
-            last->ref( new_one );
-            last = new_one;
-        }
+        
+        if ( node != nullptr )
+            node->ref( new_one );
+        node = new_one;
     }
 
-    return start;
+    return file_node;
+}
+
+void remove_empty_lines( Node * root ) {
+    set< Node * > remove;
+
+    const auto & on_line = [&]( Node * line_node ) {
+        if ( line_node->type != TYPE::LINE )
+            return true;
+        
+        if ( only_whitespace( line_node->content ) ) {
+            const auto P = { TYPE::LINE, TYPE::SOURCE_FILE };
+            auto parent = line_node->parent( P );
+            auto child = line_node->child( TYPE::LINE );
+            if ( parent && child )
+                parent->ref( child );
+            remove.insert( line_node );
+        }
+
+        return true;
+    };
+    pulse( root, on_line );
+
+    for ( const auto & r : remove )
+        delete r;
+}
+
+/** Detects comments and removes their content from lines.*/
+void parse_comments( Node * root ) {
+    const auto & on_file = [&]( Node * file_node ) {
+        if ( file_node->type != TYPE::SOURCE_FILE )
+            return true;
+        
+        //TODO: properly handle comment matchers inside literals (there is no definition for literals yet anyway) ...
+
+        bool in_multiline = false;
+        auto node = file_node->child( TYPE::LINE );
+        
+        while ( node != nullptr ) {
+            if ( in_multiline ) {
+                const auto multi_end = node->content.find( "*/" );
+                if ( multi_end == string::npos ) {
+                    //completely remove the line:
+                    auto next = node->child( TYPE::LINE );
+                    const auto P = { TYPE::LINE, TYPE::SOURCE_FILE };
+                    auto parent = node->parent( P );
+                    if ( parent && next )
+                        parent->ref( next );
+                    delete node;
+                    node = next;
+                    continue;
+                }
+                else {
+                    in_multiline = false;
+                    node->source_pos.char_start += multi_end + 2;
+                    node->content = node->content.substr( multi_end + 2 );
+                }
+            }
+
+            const auto single = node->content.find( "//", 0 );
+            if ( single != string::npos ) {
+                node->source_pos.char_end = node->source_pos.char_start + single;
+                node->content = node->content.substr( 0, single );
+            }
+            else {
+                const auto multi = node->content.find( "/*", 0 );
+                if ( multi != string::npos ) {
+                    const auto multi_end = node->content.find( "*/", multi + 2 );
+                    if ( multi_end == string::npos ) {
+                        in_multiline = true;
+                        node->source_pos.char_end = node->source_pos.char_start + multi;
+                        node->content = node->content.substr( 0, multi );
+                        //remaining on that same line to search for multiline comment ending:
+                        continue;
+                    }
+                    else {
+                        node->content = node->content.replace( multi, multi_end + 2 - multi, " " );
+                    }
+                }
+            }
+
+            node = node->child( TYPE::LINE );
+        }
+        return true;
+    };
+    pulse( root, on_file );
+
+    remove_empty_lines( root );
 }
 
 /** Spawn CHAR Nodes for every character of specified Operator and connect it with both OPERATOR and LINE Nodes.*/
@@ -291,6 +378,8 @@ auto parse_source( const string & file_name ) {
         cout << "ERROR: empty source." << endl;
         return root;
     }
+    print_lines( root );
+    parse_comments( root );
     match_operators( root );
     fix_literal_ops( root );
     match_terms( root );

@@ -65,6 +65,8 @@ const string Operators[] {
     ">",
     "<=",
     ">=",
+    "!",
+    "not",
 
     "inputs",
     "outputs",
@@ -177,8 +179,12 @@ void pulse( Node * root, const auto & on_node ) {
         to_visit.erase( v_it );
         auto node = * v_it;
 
-        if ( ! on_node( node ) )
-            return;
+        if constexpr ( is_same_v< invoke_result_t< decltype( on_node ), Node* >, bool> ) {
+            if ( ! on_node( node ) )
+                return;
+        }
+        else
+            on_node( node );
         
         const auto & visit = [&]( set< Node * > & array ) {
             //visit adjacents later on:

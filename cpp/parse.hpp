@@ -378,7 +378,6 @@ auto parse_source( const string & file_name ) {
         cout << "ERROR: empty source." << endl;
         return root;
     }
-    print_lines( root );
     parse_comments( root );
     match_operators( root );
     fix_literal_ops( root );

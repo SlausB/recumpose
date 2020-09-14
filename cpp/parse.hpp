@@ -12,6 +12,7 @@
 #include <cctype>
 #include <utility>
 #include <algorithm>
+#include <numeric>
 #include "syntax_tree.hpp"
 #include "plot.hpp"
 
@@ -278,7 +279,15 @@ void match_terms( Node * root ) {
     pulse( root, on_line );
 }
 
-void chain_terms_and_operators( Node * root ) {
+struct FileCache {
+    list< Node * > terms;
+    list< Node * > operators;
+};
+
+void chain_terms_and_operators(
+    Node * root,
+    map< Node *, FileCache > & cache
+) {
     const auto & on_file = [&]( Node * file_node ) {
         if ( file_node->type != TYPE::SOURCE_FILE )
             return;
@@ -296,7 +305,13 @@ void chain_terms_and_operators( Node * root ) {
                 }
             }
 
+            syntactic_position_sort( terms_and_ops );
             for ( auto & to : terms_and_ops ) {
+                if ( to->type == TYPE::TERM )
+                    cache[ file_node ].terms.push_back( to );
+                if ( to->type == TYPE::OPERATOR )
+                    cache[ file_node ].operators.push_back( to );
+
                 if ( caret == nullptr ) {
                     caret = to;
                     file_node->ref( caret );
@@ -311,6 +326,52 @@ void chain_terms_and_operators( Node * root ) {
     pulse( root, on_file );
 }
 
+int32_t index_in( const auto & array, const auto & el ) {
+    int32_t i = -1;
+    for ( const auto & existing : array ) {
+        ++ i;
+        if ( el == existing )
+            return i;
+    }
+    return -1;
+}
+auto random_access_at( auto & array, const auto & pos ) {
+    auto it = begin( array );
+    advance( it, pos );
+    return * it;
+}
+
+void match_semantics(
+    map< Node *, FileCache > & cache
+) {
+    for ( auto & file : cache ) {
+        auto & ops = file.second.operators;
+        //sort operators by their precedence order:
+        vector< size_t > pointers( ops.size() );
+        iota( pointers.begin(), pointers.end(), 0 );
+        stable_sort(
+            pointers.begin(),
+            pointers.end(),
+            [&](
+                const size_t & i1,
+                const size_t & i2
+            ) {
+                return
+                    index_in( Operators, random_access_at( ops, i1 )->content )
+                    <
+                    index_in( Operators, random_access_at( ops, i2 )->content )
+                ;
+            }
+        );
+
+        cout << "Operators sorted by their precedence:" << endl;
+        for ( const auto & p : pointers ) {
+            const auto & op = random_access_at( ops, p );
+            cout << "    " << op->content << " at " << op->source_pos << endl;
+        }
+    }
+}
+
 auto parse_source( const string & file_name ) {
     auto root = parse_lines( file_name );
     if ( root == nullptr ) {
@@ -320,7 +381,11 @@ auto parse_source( const string & file_name ) {
     parse_comments( root );
     match_operators( root );
     match_terms( root );
-    chain_terms_and_operators( root );
+
+    map< Node *, FileCache > cache;
+    chain_terms_and_operators( root, cache );
+    match_semantics( cache );
+
     return root;
 }
 

@@ -30,35 +30,32 @@ enum TYPE {
     EQUALITY,
     //the sophisticated (recursive?) one, not just regular function composition; regular one refers to EXPRESSION:
     COMPOSITION,
-    EXPRESSION,
     /** Something just named having a bunch of compositions in it. Adds it's compositions into program immunity and can be composed on top as well.*/
     ENTITY,
+
+    SEMANTIC,
+
+    /** Abstract construct which references operator and other terms or expressions.*/
+    EXPRESSION,
 };
 
 /** Matching is performed in order.*/
 const string Operators[] {
-    "(" ,
-    ")" ,
+    "include",
 
+    "inputs",
+    "outputs",
+
+    "!",
     ":" ,
-    ";" ,
-
-    "=" ,
-
-    "->",
-    "<-",
 
     "+" ,
     "-" ,
     "*" ,
     "/" ,
 
-    "∘" ,
-    "∘=",
-    "∘+",
-    "@" ,
-    "@=",
-    "@+",
+    "->",
+    "<-",
 
     "if",
     "then",
@@ -68,11 +65,20 @@ const string Operators[] {
     ">",
     "<=",
     ">=",
-    "!",
     "not",
 
-    "inputs",
-    "outputs",
+    "=" ,
+
+    "∘" ,
+    "∘=",
+    "∘+",
+    "@" ,
+    "@=",
+    "@+",
+
+    "(" ,
+    ")" ,
+    ";" ,
 };
 
 struct SourcePos {
@@ -169,11 +175,27 @@ struct NodeHandler {
     }
 };
 /** Sort Nodes regarding their presence in source code.*/
-void syntactic_position_sort( const auto & nodes ) {
-    sort(
-        nodes,
+void syntactic_position_sort( auto & nodes ) {
+    nodes.sort(
         []( Node * left, Node * right ) { return left->source_pos < right->source_pos; }
     );
+}
+int32_t indentation( Node * line ) {
+    int32_t r;
+    for ( auto & ch : line->content ) {
+        if ( isspace( ch ) )
+            ++ r;
+        else
+            break;
+    }
+    return r;
+}
+/** Returns true if first TYPE::LINE has more indentation than second.*/
+bool increased_indentation( Node * increased, Node * then ) {
+    return indentation( increased ) > indentation( then );
+}
+bool equal_indentation( Node * one_line, Node * another_line ) {
+    return indentation( one_line ) == indentation( another_line );
 }
 
 /** Breadth first iteration over AST.*/

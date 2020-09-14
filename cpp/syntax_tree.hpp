@@ -24,6 +24,9 @@ enum TYPE {
 
     PARENTH_BLOCK,
 
+    INPUTS,
+    OUTPUTS,
+
     EQUALITY,
     //the sophisticated (recursive?) one, not just regular function composition; regular one refers to EXPRESSION:
     COMPOSITION,
@@ -165,6 +168,13 @@ struct NodeHandler {
         return node->source_pos < n.node->source_pos;
     }
 };
+/** Sort Nodes regarding their presence in source code.*/
+void syntactic_position_sort( const auto & nodes ) {
+    sort(
+        nodes,
+        []( Node * left, Node * right ) { return left->source_pos < right->source_pos; }
+    );
+}
 
 /** Breadth first iteration over AST.*/
 void pulse( Node * root, const auto & on_node ) {

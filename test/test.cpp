@@ -55,6 +55,10 @@ TEST_CASE( "Should parse terms last line symbols as well", "[match]" ) {
     REQUIRE( terms.contains( "4" ) );
 }
 
+TEST_CASE( "Shouldn't match literal operators if it's part of bigger literals", "[match]" ) {
+
+}
+
 TEST_CASE( "Properly match single line comment", "[comment]" ) {
 
 }

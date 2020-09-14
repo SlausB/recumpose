@@ -170,6 +170,14 @@ void spawn_op_chars(
     }
 }
 
+bool is_alpha_string( const string & s ) {
+    for ( const auto ch : s ) {
+        if ( ! isalpha( ch ) )
+            return false;
+    }
+    return true;
+}
+
 bool try_match_operator(
     Node * line_node,
     const string & op,
@@ -179,6 +187,29 @@ bool try_match_operator(
 
     if ( r == string::npos )
         return false;
+
+    //deny matching if literal operator has other literals around:
+    if (
+        is_alpha_string( op )
+        &&
+        (
+            //at left:
+            (
+                r > 0
+                &&
+                isalpha( line_node->content.at( r - 1 ) )
+            )
+            ||
+            //at right:
+            (
+                r + op.size() < line_node->content.size()
+                &&
+                isalpha( line_node->content.at( r + op.size() ) )
+            )
+        )
+    ) {
+        return false;
+    }
     
     auto op_node = new Node(
         op,
@@ -208,50 +239,6 @@ void match_operators( Node * root ) {
         return true;
     };
     pulse( root, on_line );
-}
-
-/** Remove operators which consist of literals (like "if","then"...) and are parts of terms.*/
-void fix_literal_ops( Node * root ) {
-    set< Node * > remove;
-
-    const auto & on_op = [&]( Node * op_node ) {
-        if ( op_node->type != TYPE::OPERATOR )
-            return true;
-        
-        auto line_node = closest( op_node, TYPE::LINE );
-        if ( line_node == nullptr )
-            return true;
-        
-        for ( const auto ch : op_node->content ) {
-            if ( ! isalpha( ch ) )
-                return true;
-        }
-        
-        if (
-            //at left:
-            (
-                op_node->source_pos.char_start > line_node->source_pos.char_start
-                &&
-                isalpha( line_node->content.at( op_node->source_pos.char_start - 1 ) )
-            )
-            ||
-            //at right:
-            (
-                op_node->source_pos.char_end < line_node->source_pos.char_end
-                &&
-                isalpha( line_node->content.at( op_node->source_pos.char_end ) )
-            )
-        ) {
-            remove.insert( op_node );
-        }
-
-        return true;
-    };
-    pulse( root, on_op );
-
-    for ( auto & r : remove )
-        delete r;
-    cout << remove.size() << " literals Operators fixed back to become terms." << endl;
 }
 
 void match_terms( Node * root ) {
@@ -291,85 +278,37 @@ void match_terms( Node * root ) {
     pulse( root, on_line );
 }
 
-auto match_symmetries( Node * root ) {
-    const auto & on_equal = [&]( Node * eq_node ) {
-        if ( eq_node->type != TYPE::OPERATOR || eq_node->content != "=" )
-            return true;
+void chain_terms_and_operators( Node * root ) {
+    const auto & on_file = [&]( Node * file_node ) {
+        if ( file_node->type != TYPE::SOURCE_FILE )
+            return;
         
-        auto line_node = closest( eq_node, TYPE::LINE );
-        if ( line_node == nullptr )
-            throw runtime_error( "Equal operator without line" );
+        //expression that is currently being parsed:
+        Node * caret = nullptr;
         
-        list< NodeHandler > sorted;
-        for ( const auto & ref : line_node->refs ) {
-            switch ( ref->type ) {
-                case TYPE::TERM:
-                case TYPE::OPERATOR:
-                    sorted.push_back( NodeHandler( ref ) );
-                    break;
-                default:
-                    break;
+        auto line_node = file_node;
+        while ( ( line_node = line_node->child( TYPE::LINE ) ) ) {
+            list< Node * > terms_and_ops;
+
+            for ( auto & to_ref : line_node->refs ) {
+                if ( to_ref->type == TYPE::TERM || to_ref->type == TYPE::OPERATOR ) {
+                    terms_and_ops.push_back( to_ref );
+                }
             }
-        }
-        sorted.sort();
 
-        cout << "Line " << line_node->source_pos.line << " has these TERMs and OPERATORs refs: " << endl;
-        for ( const auto & h : sorted )
-            cout << "    " << h.node->content << endl;
-        
-        list< list< Node * > > expressions;
-        set< Node * > equality_nodes;
-        {
-            list< Node * > building_expr;
-            for ( auto & h : sorted ) {
-                if ( h.node->type == TYPE::OPERATOR && h.node->content == "=" ) {
-                    expressions.push_back( building_expr );
-                    building_expr.clear();
-
-                    auto equality_node = new Node(
-                        "=",
-                        TYPE::EQUALITY,
-                        h.node->source_pos
-                    );
-                    equality_nodes.insert( equality_node );
-                    line_node->ref( equality_node );
+            for ( auto & to : terms_and_ops ) {
+                if ( caret == nullptr ) {
+                    caret = to;
+                    file_node->ref( caret );
                 }
                 else {
-                    building_expr.push_back( h.node );
+                    caret->ref( to );
+                    caret = to;
                 }
             }
-            expressions.push_back( building_expr );
         }
-        for ( auto & es : expressions ) {
-            if ( es.size() < 1 ) {
-                cout << "ERROR: expected expressions around \"=\" operator." << endl;
-            }
-            else {
-                auto expr_node = new Node(
-                    "",
-                    TYPE::EXPRESSION,
-                    line_node->source_pos
-                );
-                expr_node->source_pos.char_start = es.front()->source_pos.char_start;
-                expr_node->source_pos.char_start = es.back() ->source_pos.char_end;
-                bool first = true;
-                for ( const auto & e : es ) {
-                    if ( ! first )
-                        expr_node->content += " ";
-                    first = false;
-                    expr_node->content += e->content;
-                    expr_node->ref( e );
-                }
-                line_node->ref( expr_node );
-
-                for ( auto & eq_node : equality_nodes )
-                    expr_node->ref( eq_node );
-            }
-        }
-
-        return true;
     };
-    pulse( root, on_equal );
+    pulse( root, on_file );
 }
 
 auto parse_source( const string & file_name ) {
@@ -380,9 +319,8 @@ auto parse_source( const string & file_name ) {
     }
     parse_comments( root );
     match_operators( root );
-    fix_literal_ops( root );
     match_terms( root );
-    match_symmetries( root );
+    chain_terms_and_operators( root );
     return root;
 }
 

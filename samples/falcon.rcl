@@ -1,9 +1,12 @@
 
 /** Program implements nest's "door" which should open everytime bird approaches, but should NOT open when the bird is falcon. But when it's raining door should keep working normally (ignore falcon logic).*/
 
-inputs : bird raining
-nest :
+inputs bird raining
+
+nest
     door <- if bird then opened else closed
-falcon:
+falcon
     door ∘+ if bird == 350 then closed
 falcon ∘= if ! raining then falcon
+
+outputs door

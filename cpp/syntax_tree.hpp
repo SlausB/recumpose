@@ -199,7 +199,17 @@ bool equal_indentation( Node * one_line, Node * another_line ) {
 }
 
 /** Breadth first iteration over AST.*/
-void pulse( Node * root, const auto & on_node ) {
+template<
+    typename Func,
+    bool Refs = true,
+    bool Refd = true,
+    typename TypesFilter = bool
+>
+void pulse(
+    Node * root,
+    Func const & on_node,
+    TypesFilter const & types_filter = false
+) {
     set< Node * > visited;
     visited.insert( root );
 
@@ -211,7 +221,7 @@ void pulse( Node * root, const auto & on_node ) {
         to_visit.erase( v_it );
         auto node = * v_it;
 
-        if constexpr ( is_same_v< invoke_result_t< decltype( on_node ), Node* >, bool> ) {
+        if constexpr ( is_same_v< invoke_result_t< decltype( on_node ), Node* >, bool > ) {
             if ( ! on_node( node ) )
                 return;
         }
@@ -221,13 +231,16 @@ void pulse( Node * root, const auto & on_node ) {
         const auto & visit = [&]( set< Node * > & array ) {
             //visit adjacents later on:
             for ( auto next : array ) {
-                //... only if wasn't visited already:
+                //... only if wasn't visited yet:
                 if ( visited.insert( next ).second )
                     to_visit.insert( next );
             }
         };
-        visit( node->refs );
-        visit( node->refd );
+        if constexpr ( Refs )
+            visit( node->refs );
+        if constexpr ( Refd )
+            visit( node->refd );
+        static_assert( Refs || Refd, "pulse(): should traverse at least some direction" );
     }
 }
 /** Returns first occurence of Node with specified TYPE around center Node or nullptr.*/

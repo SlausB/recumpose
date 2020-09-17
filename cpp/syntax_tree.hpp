@@ -10,6 +10,7 @@
 #include <set>
 #include <cctype>
 #include <utility>
+#include <ranges>
 
 using namespace std;
 
@@ -39,47 +40,70 @@ enum TYPE {
     EXPRESSION,
 };
 
-/** Matching is performed in order.*/
-const string Operators[] {
-    "include",
-
-    "inputs",
-    "outputs",
-
-    "!",
-    ":" ,
-
-    "+" ,
-    "-" ,
-    "*" ,
-    "/" ,
-
-    "->",
-    "<-",
-
-    "if",
-    "then",
-    "else",
-    "<",
-    "==",
-    ">",
-    "<=",
-    ">=",
-    "not",
-
-    "=" ,
-
-    "∘" ,
-    "∘=",
-    "∘+",
-    "@" ,
-    "@=",
-    "@+",
-
-    "(" ,
-    ")" ,
-    ";" ,
+enum OPERAND {
+    INFIX,
+    LEFT,
+    RIGHT,
 };
+
+const vector< pair< string, OPERAND > > OperatorsDesc = {
+    { "!"      , RIGHT },
+    { ":"      , INFIX },
+
+    { "+"      , INFIX },
+    { "-"      , INFIX },
+    { "*"      , INFIX },
+    { "/"      , INFIX },
+
+    { "->"     , INFIX },
+    { "<-"     , INFIX },
+
+    { "if"     , RIGHT },
+    { "then"   , RIGHT },
+    { "else"   , RIGHT },
+    { "<"      , INFIX },
+    { "=="     , INFIX },
+    { ">"      , INFIX },
+    { "<="     , INFIX },
+    { ">="     , INFIX },
+    { "not"    , RIGHT },
+
+    { "include", RIGHT },
+
+    { "inputs" , RIGHT },
+    { "outputs", RIGHT },
+
+    { "="      , INFIX },
+
+    { "∘"      , INFIX },
+    { "∘="     , INFIX },
+    { "∘+"     , INFIX },
+    { "@"      , INFIX },
+    { "@="     , INFIX },
+    { "@+"     , INFIX },
+
+    { "("      , RIGHT },
+    { ")"      , LEFT  },
+    { ";"      , LEFT  },
+};
+
+/** Matching is performed in order.*/
+//const string Operators[] = statically_extract_pair_first_elements( ) {};
+const vector< string > Operators = []{
+    vector< string > data;
+    for ( const auto & pair : OperatorsDesc ) { // or with c++20 : ranges & use set's InputIt constructor
+        data.push_back( pair.first );
+    }
+    return data;
+}();
+
+const map< string, OPERAND > Operands = []{
+    map< string, OPERAND > data;
+    for ( const auto & pair : OperatorsDesc ) {
+        data[ pair.first ] = pair.second;
+    }
+    return data;
+}();
 
 struct SourcePos {
     string file;
@@ -198,17 +222,22 @@ bool equal_indentation( Node * one_line, Node * another_line ) {
     return indentation( one_line ) == indentation( another_line );
 }
 
-/** Breadth first iteration over AST.*/
+/** Breadth first iteration over AST.
+@param types_filter set of TYPEs over which on traverse should follow. If empty traverse follows over any TYPEs passing those specified in types_pass.
+@param types_pass set of TYPEs over which traverse shouuld NOT follow. If empty traverse follows over any TYPEs specified in types_filter.
+*/
 template<
-    typename Func,
     bool Refs = true,
     bool Refd = true,
-    typename TypesFilter = bool
+    typename TypesFilter = bool,
+    typename TypesPass = bool,
+    typename Func
 >
 void pulse(
     Node * root,
     Func const & on_node,
-    TypesFilter const & types_filter = false
+    TypesFilter const & types_filter = false,
+    TypesPass const & types_pass = false
 ) {
     set< Node * > visited;
     visited.insert( root );
@@ -231,6 +260,18 @@ void pulse(
         const auto & visit = [&]( set< Node * > & array ) {
             //visit adjacents later on:
             for ( auto next : array ) {
+                //skip if filter specified and doesn't have current TYPE:
+                if constexpr ( ! is_same_v< TypesFilter, bool > ) {
+                    if ( types_filter.find( next->type ) == types_filter.end() )
+                        continue;
+                }
+
+                //skip if pass specified and does have current TYPE:
+                if constexpr ( ! is_same_v< TypesPass, bool > ) {
+                    if ( types_pass.find( next->type ) != types_pass.end() )
+                        continue;
+                }
+
                 //... only if wasn't visited yet:
                 if ( visited.insert( next ).second )
                     to_visit.insert( next );
@@ -255,6 +296,14 @@ Node * closest( Node * center, const TYPE type ) {
     };
     pulse( center, on_node );
     return result;
+}
+
+Node * find_type( auto & in, const TYPE type ) {
+    for ( auto r : in ) {
+        if ( r->type == type )
+            return r;
+    }
+    return nullptr;
 }
 
 void print_lines( Node * root ) {

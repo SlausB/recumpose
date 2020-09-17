@@ -18,6 +18,7 @@
 
 using namespace std;
 
+/** Returns true if specified string consist of whitespace characters only.*/
 bool only_whitespace( const string & line ) {
     for ( const auto & ch : line ) {
         if ( ! isspace( ch ) )
@@ -171,6 +172,7 @@ void spawn_op_chars(
     }
 }
 
+/** Returns true if specified string contains of alphabetic characters only.*/
 bool is_alpha_string( const string & s ) {
     for ( const auto ch : s ) {
         if ( ! isalpha( ch ) )
@@ -179,7 +181,7 @@ bool is_alpha_string( const string & s ) {
     return true;
 }
 
-bool try_match_operator(
+bool match_operator(
     Node * line_node,
     const string & op,
     size_t & caret
@@ -188,6 +190,14 @@ bool try_match_operator(
 
     if ( r == string::npos )
         return false;
+    
+    //TODO: skip it if matched source range intersect with some other matched element:
+    /*for ( auto line_el : line_node->refs ) {
+        if ( line_el.type == TYPE::SOURCE_FILE || line_el.type == TYPE::LINE )
+            continue;
+        if ( line_el->source_pos.intersects( r, op.size() ) )
+            return false;
+    }*/
 
     //deny matching if literal operator has other literals around:
     if (
@@ -229,10 +239,11 @@ void match_operators( Node * root ) {
         if ( line_node->type != TYPE::LINE )
             return true;
         
+        //TODO: match operators starting from longest to shortest ones:
         for ( const auto & op : Operators ) {
             size_t caret = 0;
             while ( caret < line_node->content.size() ) {
-                if ( ! try_match_operator( line_node, op, caret ) )
+                if ( ! match_operator( line_node, op, caret ) )
                     break;
             }
         }
@@ -335,40 +346,125 @@ int32_t index_in( const auto & array, const auto & el ) {
     }
     return -1;
 }
+/** Returns element at specified position within ordered container with random access ability (like list, vector, array, etc.).*/
 auto random_access_at( auto & array, const auto & pos ) {
     auto it = begin( array );
     advance( it, pos );
     return * it;
 }
 
+/** Returns operators sorted by their semantical precedence.*/
+template< typename Ops >
+auto semantic_operators_order( const Ops & ops ) {
+    //sort operators by their precedence order:
+    vector< size_t > pointers( ops.size() );
+    iota( pointers.begin(), pointers.end(), 0 );
+    stable_sort(
+        pointers.begin(),
+        pointers.end(),
+        [&](
+            const size_t & i1,
+            const size_t & i2
+        ) {
+            return
+                index_in( Operators, random_access_at( ops, i1 )->content )
+                <
+                index_in( Operators, random_access_at( ops, i2 )->content )
+            ;
+        }
+    );
+
+    list< typename Ops::value_type > result;
+    for ( const auto & p : pointers )
+        result.push_back( random_access_at( ops, p ) );
+    return result;
+}
+
+Node * ultimate_parent_expression( Node * source ) {
+    const set< TYPE > pass{ TYPE::LINE, TYPE::SOURCE_FILE };
+    const auto & on_parent = [&]( Node * parent ) {
+        source = parent;
+    };
+    pulse< false >( source, on_parent, false, pass );
+    return source;
+}
+
+auto obtain_relative( Node * op, auto & from, const string & orient ) {
+    auto right_term = find_type( from, TYPE::TERM );
+    if ( right_term == nullptr ) {
+        cout << "ERROR: no term at " << orient << " from operator " << op->content << " at " << op->source_pos << endl;
+        throw runtime_error( "semantics error" );
+    }
+    return ultimate_parent_expression( right_term );
+}
+
+auto consume_left( Node * op, Node * expr = nullptr ) {
+    auto left = obtain_relative( op, op->refd, "left" );
+
+    if ( expr == nullptr )
+        expr = new Node(
+            op->content + " expression",
+            TYPE::EXPRESSION,
+            //TODO: merge sources:
+            op->source_pos
+        );
+    expr->ref( op );
+    expr->ref( left );
+    return expr;
+}
+auto consume_right( Node * op, Node * expr = nullptr ) {
+    auto right = obtain_relative( op, op->refs, "right" );
+
+    if ( expr == nullptr )
+        expr = new Node(
+            op->content + " expression",
+            TYPE::EXPRESSION,
+            //TODO: merge sources:
+            op->source_pos
+        );
+    expr->ref( op );
+    expr->ref( right );
+    return expr;
+}
+void consume_infix( Node * op ) {
+    auto expr = consume_left( op );
+    consume_right( op, expr );
+}
+
 void match_semantics(
     map< Node *, FileCache > & cache
 ) {
     for ( auto & file : cache ) {
-        auto & ops = file.second.operators;
-        //sort operators by their precedence order:
-        vector< size_t > pointers( ops.size() );
-        iota( pointers.begin(), pointers.end(), 0 );
-        stable_sort(
-            pointers.begin(),
-            pointers.end(),
-            [&](
-                const size_t & i1,
-                const size_t & i2
-            ) {
-                return
-                    index_in( Operators, random_access_at( ops, i1 )->content )
-                    <
-                    index_in( Operators, random_access_at( ops, i2 )->content )
-                ;
-            }
-        );
+        auto ops = semantic_operators_order( file.second.operators );
 
         cout << "Operators sorted by their precedence:" << endl;
-        for ( const auto & p : pointers ) {
-            const auto & op = random_access_at( ops, p );
+        for ( const auto & op : ops ) {
             cout << "    " << op->content << " at " << op->source_pos << endl;
         }
+
+        //operators consume their operands:
+        for ( const auto & op : ops ) {
+            switch ( Operands.at( op->content ) ) {
+                case OPERAND::INFIX:
+                    consume_infix( op );
+                    break;
+                case OPERAND::LEFT:
+                    consume_left( op );
+                    break;
+                case OPERAND::RIGHT:
+                    consume_right( op );
+                    break;
+            }
+        }
+
+        /*//remaining terms are Entities:
+        for ( auto entity : file.second.terms ) {
+            auto parent_expr = ultimate_parent_expression( entity );
+            //if not an entity:
+            if ( parent_expr != entity )
+                continue;
+            consume_right( entity );
+        }*/
     }
 }
 

@@ -720,7 +720,7 @@ auto parse( const string & file_name )
 
     print_symmetries( root );
 
-    plot( root, set{ TYPE::EXPRESSION } );
+    plot( root, set{ TYPE::EXPRESSION, TYPE::TERM }, "semantics" );
 
     cout << "Done." << endl;
 }

@@ -16,16 +16,14 @@ struct Plot {
     TYPE type;
 
     ofstream o;
-    string file_name;
-    string graph_name;
+    string name;
 
     Plot(
         TYPE type = TYPE::DIRECTED,
-        const string & file_name = string( "graph.dot" ),
-        const string & graph_name = string( "recumpose" )
-    ): type(type), file_name(file_name), graph_name(graph_name)  {
-        o.open( file_name );
-        o << ( type == TYPE::DIRECTED ? "digraph " : "graph " ) << graph_name << " {" << endl;
+        const string & name = string( "graph" )
+    ): type(type), name(name) {
+        o.open( name + ".dot" );
+        o << ( type == TYPE::DIRECTED ? "digraph " : "graph " ) << name << " {" << endl;
     }
 
     void relation( const auto & from, const auto & to ) {
@@ -38,7 +36,7 @@ struct Plot {
 
     ~Plot() {
         o << "}" << endl;
-        const string command = string( "dot -Tpng " ) + file_name + " -o " + graph_name + ".png";
+        const string command = string( "dot -Tpng " ) + name + ".dot" + " -o " + name + ".png";
         system( command.c_str() );
     }
     auto f() {
@@ -51,8 +49,12 @@ auto name( Node * node ) {
 };
 
 template< typename PlotTypes >
-auto plot( Node * root, const PlotTypes & plot_types = {} ) {
-    Plot p;
+auto plot(
+    Node * root,
+    const PlotTypes & plot_types = {},
+    const auto & graph_name = "graph"
+) {
+    Plot p( Plot::TYPE::DIRECTED, graph_name );
     map< uint64_t, string > labels;
 
     const auto & should_plot = [&]( Node * node ) {

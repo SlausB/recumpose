@@ -282,7 +282,7 @@ void syntactic_position_sort( auto & nodes ) {
     );
 }
 int32_t indentation( Node * line ) {
-    int32_t r;
+    int32_t r = 0;
     for ( auto & ch : line->content ) {
         if ( isspace( ch ) )
             ++ r;

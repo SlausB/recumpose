@@ -555,6 +555,46 @@ void connect_ifs( Node * root ) {
     pulse( root, on_node );
 }
 
+Node * find_line_from_expression( Node * expr ) {
+    Node * result = nullptr;
+    const auto & on_node = [&]( Node * node ) {
+        if ( node->type( set{ TYPE::TERM, TYPE::OPERATOR } ) ) {
+            result = find_types( node->refd, TYPE::LINE );
+            return false;
+        }
+        return true;
+    };
+    pulse< true, false >( expr, on_node );
+    return result;
+}
+
+void consume_right_until_indentation( Node * from, auto & syntactic_it, const string & name, const auto & until ) {
+    Node * line = find_line_from_expression( from );
+    Node * rolling = nullptr;
+    while ( syntactic_it != until ) {
+        auto right = * syntactic_it;
+
+        auto right_line = find_line_from_expression( right );
+        if ( right_line != line && ! increased_indentation( right_line, line ) ) {
+            cout << "        different lines " << line << " AND " << right_line << " and NOT increased indentation" << endl;
+            break;
+        }
+        
+        if ( rolling == nullptr ) {
+            rolling = new Node(
+                from->content + " " + name,
+                TYPE::EXPRESSION,
+                from->source_pos
+            );
+            rolling->ref( from );
+            cout << "        spawned EXPRESSION for left " << from << endl;
+        }
+        cout << "        spawned RIGHT " << right << endl;
+        rolling->ref( right );
+        ++ syntactic_it;
+    }
+}
+
 void match_right_all( Node * file ) {
     set< Node * > top_level_set;
     const auto & on_node = [&]( Node * node ) {
@@ -575,8 +615,24 @@ void match_right_all( Node * file ) {
     syntactic_position_sort( top_level_list );
 
     cout << "Top level semantic nodes of file " << file->content << " in syntactic order:" << endl;
-    for ( const auto & expr : top_level_list ) {
-        cout << "    " << expr << endl;
+    auto tl_it = top_level_list.begin();
+    while ( tl_it != top_level_list.end() ) {
+        auto tl = * tl_it;
+        cout << "    " << tl << endl;
+        ++ tl_it;
+
+        //RIGHT_ALL operand:
+        if ( tl->type( TYPE::OPERATOR ) ) {
+            consume_right_until_indentation( tl, tl_it, "operator", top_level_list.end() );
+            continue;
+        }
+
+        //entity:
+        if ( tl->type( TYPE::TERM ) ) {
+            consume_right_until_indentation( tl, tl_it, "entity", top_level_list.end() );
+            //TODO: maybe recursively? To handle potential entities defined as part of bigger entities (does it make any sense though?) ...
+            continue;
+        }
     }
 }
 void match_right_all_files( Node * root ) {
@@ -648,7 +704,7 @@ auto parse( const string & file_name )
 
     print_symmetries( root );
 
-    plot( root, set{ TYPE::LINE, TYPE::TERM, TYPE::OPERATOR } );
+    plot( root, set{ TYPE::EXPRESSION } );
 
     cout << "Done." << endl;
 }

@@ -67,16 +67,16 @@ auto plot( Node * root, const PlotTypes & plot_types = {} ) {
 
     const auto & on_node = [&]( Node * node ) {
         if ( ! should_plot( node ) )
-            return true;
+            return;
         for ( const auto & ref : node->refs ) {
-            if ( should_plot( ref ) ) {
-                p.relation( name( node ), name( ref ) );
-                
-                labels[ name( node ) ] = label( node );
-                labels[ name( ref  ) ] = label( ref  );
-            }
+            if ( ! should_plot( ref ) )
+                continue;
+            
+            p.relation( name( node ), name( ref ) );
+            
+            labels[ name( node ) ] = label( node );
+            labels[ name( ref  ) ] = label( ref  );
         }
-        return true;
     };
     pulse( root, on_node );
 

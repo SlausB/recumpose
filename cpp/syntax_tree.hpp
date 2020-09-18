@@ -39,12 +39,39 @@ enum TYPE {
     /** Abstract construct which references operator and other terms or expressions.*/
     EXPRESSION,
 };
+ostream & operator <<( ostream & os, const TYPE & o ) {
+    switch ( o ) {
+        case TYPE::SOURCE_FILE  : os << "SOURCE_FILE"  ; break;
+        case TYPE::LINE         : os << "LINE"         ; break;
+        case TYPE::TERM         : os << "TERM"         ; break;
+        case TYPE::OPERATOR     : os << "OPERATOR"     ; break;
+        case TYPE::PARENTH_BLOCK: os << "PARENTH_BLOCK"; break;
+        case TYPE::INPUTS       : os << "INPUTS"       ; break;
+        case TYPE::OUTPUTS      : os << "OUTPUTS"      ; break;
+        case TYPE::EQUALITY     : os << "EQUALITY"     ; break;
+        case TYPE::COMPOSITION  : os << "COMPOSITION"  ; break;
+        case TYPE::ENTITY       : os << "ENTITY"       ; break;
+        case TYPE::SEMANTIC     : os << "SEMANTIC"     ; break;
+        case TYPE::EXPRESSION   : os << "EXPRESSION"   ; break;
+    }
+    return os;
+}
 
 enum OPERAND {
     INFIX,
     LEFT,
     RIGHT,
+    RIGHT_ALL,
 };
+ostream & operator <<( ostream & os, const OPERAND & o ) {
+    switch ( o ) {
+        case OPERAND::INFIX    : os << "INFIX"    ; break;
+        case OPERAND::LEFT     : os << "LEFT"     ; break;
+        case OPERAND::RIGHT    : os << "RIGHT"    ; break;
+        case OPERAND::RIGHT_ALL: os << "RIGHT_ALL"; break;
+    }
+    return os;
+}
 
 /** In semantics matching order.*/
 const vector< pair< string, OPERAND > > OperatorsDesc = {
@@ -56,23 +83,23 @@ const vector< pair< string, OPERAND > > OperatorsDesc = {
     { "*"      , INFIX },
     { "/"      , INFIX },
 
-    { "if"     , RIGHT },
-    { "then"   , RIGHT },
-    { "else"   , RIGHT },
+    { "not"    , RIGHT },
     { "<"      , INFIX },
     { "=="     , INFIX },
     { ">"      , INFIX },
     { "<="     , INFIX },
     { ">="     , INFIX },
-    { "not"    , RIGHT },
+    { "if"     , RIGHT },
+    { "then"   , RIGHT },
+    { "else"   , RIGHT },
 
     { "->"     , INFIX },
     { "<-"     , INFIX },
 
-    { "include", RIGHT },
+    { "include", RIGHT_ALL },
 
-    { "inputs" , RIGHT },
-    { "outputs", RIGHT },
+    { "inputs" , RIGHT_ALL },
+    { "outputs", RIGHT_ALL },
 
     { "="      , INFIX },
 

@@ -31,7 +31,7 @@ Node * parse_lines( const string & file_name ) {
     ifstream file( file_name );
 
     auto file_node = new Node(
-        "",
+        file_name,
         TYPE::SOURCE_FILE,
         SourcePos( 0, 0, 0, file_name )
     );
@@ -419,18 +419,26 @@ Node * consume_infix( Node * op ) {
     return expr;
 }
 
-void match_entities( Node * file ) {
+void match_right_all( Node * file ) {
     set< Node * > top_level_set;
     const auto & on_node = [&]( Node * node ) {
-        //if top level expression:
-        if ( find_types( node->refd, vector{ TYPE::EXPRESSION, TYPE::ENTITY } ) == nullptr )
-            top_level_set.insert( node );
+        if ( node->type == TYPE::LINE || node->type == TYPE::SOURCE_FILE )
+            return;
+        //if NOT top level expression:
+        if ( find_types( node->refd, vector{ TYPE::EXPRESSION, TYPE::ENTITY } ) != nullptr )
+            return;
+        top_level_set.insert( node );
     };
     pulse( file, on_node, false, set{ TYPE::SOURCE_FILE } );
 
-    cout << "Top level EXPRESSIONs of file " << file->content << ":" << endl;
-    for ( const auto & expr : top_level_set ) {
-        cout << "    " << expr->content << " at " << expr->source_pos << endl;
+    list< Node * > top_level_list;
+    for ( auto & n : top_level_set )
+        top_level_list.push_back( n );
+    syntactic_position_sort( top_level_list );
+
+    cout << "Top level EXPRESSIONs of file " << file->content << " in syntactic order:" << endl;
+    for ( const auto & expr : top_level_list ) {
+        cout << "    " << expr->type << " \"" << expr->content << "\" at " << expr->source_pos << endl;
     }
 }
 
@@ -459,6 +467,9 @@ void match_semantics(
                 case OPERAND::RIGHT:
                     expr = consume_right( op );
                     break;
+                //will be matched later on:
+                case OPERAND::RIGHT_ALL:
+                    continue;
             }
 
             if ( expr == nullptr ) {
@@ -471,7 +482,7 @@ void match_semantics(
             }
         }
 
-        /*//remaining terms are Entities:
+        /*//remaining terms are RIGHT_ALL operators or Entities:
         list< Node * > entities;
         for ( auto entity : file.second.terms ) {
             auto parent_expr = ultimate_parent_expression( entity );
@@ -479,7 +490,7 @@ void match_semantics(
             if ( parent_expr == entity )
                 entities.push_back( entity );
         }*/
-        match_entities( file.first );
+        match_right_all( file.first );
     }
 }
 

@@ -191,13 +191,12 @@ bool match_operator(
     if ( r == string::npos )
         return false;
     
-    //TODO: skip it if matched source range intersect with some other matched element:
-    /*for ( auto line_el : line_node->refs ) {
-        if ( line_el.type == TYPE::SOURCE_FILE || line_el.type == TYPE::LINE )
+    for ( auto line_el : line_node->refs ) {
+        if ( line_el->type == TYPE::SOURCE_FILE || line_el->type == TYPE::LINE )
             continue;
-        if ( line_el->source_pos.intersects( r, op.size() ) )
+        if ( line_el->source_pos.intersects( SourcePos( line_el->source_pos.line, r + 1, r + 1 + op.size() ), false ) )
             return false;
-    }*/
+    }
 
     //deny matching if literal operator has other literals around:
     if (
@@ -239,8 +238,7 @@ void match_operators( Node * root ) {
         if ( line_node->type != TYPE::LINE )
             return true;
         
-        //TODO: match operators starting from longest to shortest ones:
-        for ( const auto & op : Operators ) {
+        for ( const auto & op : LongerOperators ) {
             size_t caret = 0;
             while ( caret < line_node->content.size() ) {
                 if ( ! match_operator( line_node, op, caret ) )
@@ -389,23 +387,29 @@ Node * ultimate_parent_expression( Node * source ) {
     return source;
 }
 
-auto obtain_relative( Node * op, auto & from, const string & orient ) {
-    auto right_term = find_type( from, TYPE::TERM );
-    if ( right_term == nullptr ) {
-        cout << "ERROR: no term at " << orient << " from operator " << op->content << " at " << op->source_pos << endl;
+/** Obtain term at specified Node's relation up to it's most composed EXPRESSION.*/
+Node * relative_term_up_to_expression( auto & from ) {
+    auto rel = find_type( from, TYPE::TERM );
+    if ( rel == nullptr )
+        return nullptr;
+    return ultimate_parent_expression( rel );
+}
+
+auto check_rel_presence( const Node * from, const Node * term, const string & orient ) {
+    if ( term == nullptr ) {
+        cout << "ERROR: no term at " << orient << " from operator " << from->content << " at " << from->source_pos << endl;
         throw runtime_error( "semantics error" );
     }
-    return ultimate_parent_expression( right_term );
 }
 
 auto consume_left( Node * op, Node * expr = nullptr ) {
-    auto left = obtain_relative( op, op->refd, "left" );
+    auto left = relative_term_up_to_expression( op->refd );
+    check_rel_presence( op, left, "left" );
 
     if ( expr == nullptr )
         expr = new Node(
             op->content + " expression",
             TYPE::EXPRESSION,
-            //TODO: merge sources:
             op->source_pos
         );
     expr->ref( op );
@@ -413,13 +417,13 @@ auto consume_left( Node * op, Node * expr = nullptr ) {
     return expr;
 }
 auto consume_right( Node * op, Node * expr = nullptr ) {
-    auto right = obtain_relative( op, op->refs, "right" );
+    auto right = relative_term_up_to_expression( op->refs );
+    check_rel_presence( op, right, "right" );
 
     if ( expr == nullptr )
         expr = new Node(
             op->content + " expression",
             TYPE::EXPRESSION,
-            //TODO: merge sources:
             op->source_pos
         );
     expr->ref( op );
@@ -457,14 +461,15 @@ void match_semantics(
             }
         }
 
-        /*//remaining terms are Entities:
+        //remaining terms are Entities:
         for ( auto entity : file.second.terms ) {
             auto parent_expr = ultimate_parent_expression( entity );
-            //if not an entity:
+            //if not an entity (thus was consumed by some operator):
             if ( parent_expr != entity )
                 continue;
-            consume_right( entity );
-        }*/
+            //TODO:
+            //consume_right( entity );
+        }
     }
 }
 

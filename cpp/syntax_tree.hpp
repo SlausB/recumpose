@@ -11,6 +11,7 @@
 #include <cctype>
 #include <utility>
 #include <ranges>
+#include <algorithm>
 
 using namespace std;
 
@@ -46,6 +47,7 @@ enum OPERAND {
     RIGHT,
 };
 
+/** In semantics matching order.*/
 const vector< pair< string, OPERAND > > OperatorsDesc = {
     { "!"      , RIGHT },
     { ":"      , INFIX },
@@ -87,8 +89,6 @@ const vector< pair< string, OPERAND > > OperatorsDesc = {
     { ";"      , LEFT  },
 };
 
-/** Matching is performed in order.*/
-//const string Operators[] = statically_extract_pair_first_elements( ) {};
 const vector< string > Operators = []{
     vector< string > data;
     for ( const auto & pair : OperatorsDesc ) { // or with c++20 : ranges & use set's InputIt constructor
@@ -105,11 +105,19 @@ const map< string, OPERAND > Operands = []{
     return data;
 }();
 
+/** Operators sorted from long to short.*/
+const vector< string > LongerOperators = []{
+    vector< string > data = Operators;
+    //TODO: it thinks of "∘=" as being 4 chars long:
+    sort( data.begin(), data.end(), []( const string & l, const string & s ) { return l.size() > s.size(); } );
+    return data;
+}();
+
 struct SourcePos {
     string file;
-    /** Starts from 1 as it is in text editors.*/
+    /** 1-based numbered as it is in text editors.*/
     int32_t line;
-    /** Which characters this node spans within source. Starts from 1 as it is in text editors.*/
+    /** Which characters this node spans within source. 1-based numbered as it is in text editors.*/
     int32_t char_start;
     int32_t char_end;
 
@@ -129,6 +137,18 @@ struct SourcePos {
             char_start + disp + length - 1,
             file
         );
+    }
+
+    bool intersects( const SourcePos & o, const bool & check_file = true ) const {
+        if ( check_file && file != o.file )
+            return false;
+        if ( line != o.line )
+            return false;
+        if ( char_start > o.char_end )
+            return false;
+        if ( char_end < o.char_start )
+            return false;
+        return true;
     }
 
     auto operator<=>(const SourcePos&) const = default;

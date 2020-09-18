@@ -361,20 +361,30 @@ auto semantic_operators_order( const Ops & ops ) {
     return result;
 }
 
-Node * ultimate_parent_expression( Node * source ) {
+/** @param or_stop set of contents to stop on if specified and reached.*/
+template< typename Stop = bool >
+Node * ultimate_parent_expression( Node * source, const Stop & or_stop = false ) {
     const auto & on_parent = [&]( Node * parent ) {
         source = parent;
+        if constexpr ( ! is_same_v< Stop, bool > ) {
+            for ( const auto & content : or_stop ) {
+                if ( source->content == content )
+                    return false;
+            }
+        }
+        return true;
     };
     pulse< false >( source, on_parent, set{ TYPE::EXPRESSION } );
     return source;
 }
 
 /** Obtain term at specified Node's relation up to it's most composed EXPRESSION.*/
-Node * relative_term_up_to_expression( auto & from ) {
+template< typename Stop = bool >
+Node * relative_term_up_to_expression( auto & from, const Stop & or_stop = false ) {
     auto rel = find_types( from, vector{ TYPE::OPERATOR, TYPE::TERM } );
     if ( rel == nullptr )
         return nullptr;
-    return ultimate_parent_expression( rel );
+    return ultimate_parent_expression( rel, or_stop );
 }
 
 auto check_rel_presence( const Node * from, const Node * term, const string & orient ) {
@@ -462,12 +472,85 @@ void match_semantics(
     }
 }
 
+auto bottom_semantics( Node * node ) {
+    list< Node * > bottom;
+    const auto & on_child = [&]( Node * child ) {
+        for ( auto deep : child->refs ) {
+            if ( deep->type( set{ TYPE::TERM, TYPE::OPERATOR } ) )
+                bottom.push_back( deep );
+        }
+    };
+    pulse< true, false >( node, on_child, set{ TYPE::EXPRESSION } );
+    syntactic_position_sort( bottom );
+    return bottom;
+}
+
 void connect_ifs( Node * root ) {
     const auto & on_node = []( Node * node ) {
         if ( ! node->type( TYPE::EXPRESSION ) )
             return;
         
-        //TODO
+        //if not top-level expression:
+        if ( find_types( node->refd, TYPE::EXPRESSION ) )
+            return;
+        
+        if ( node->content == "then expression" ) {
+            auto left = relative_term_up_to_expression( bottom_semantics( node ).front()->refd, vector{ "if expression" } );
+            if ( left == nullptr || left->content != "if expression" ) {
+                ostringstream str;
+                str << "ERROR: no if expression at left of " << node;
+                cout << str.str() << endl;
+
+                cout << "    left: " << left << endl;
+                const auto bottom = bottom_semantics( node );
+                cout << "    it has bottom semantics (syntactically ordered):" << endl;
+                for ( const auto & b : bottom )
+                    cout << "        " << b << endl;
+                
+                cout << "    referenced by:" << endl;
+                for ( const auto & pr : bottom_semantics( node ).front()->refd )
+                    cout << "        " << pr << endl;
+                
+                cout << "    refs:" << endl;
+                for ( const auto & ref : node->refs ) {
+                    cout << "        " << ref << endl;
+
+                    cout << "            red:" << endl;
+                    for ( const auto & red : ref->refd ) {
+                        cout << "                " << red << endl;
+                    }
+                }
+
+                throw runtime_error( str.str() );
+            }
+
+            auto if_then = new Node(
+                "if-then expression",
+                TYPE::EXPRESSION,
+                left->source_pos
+            );
+            if_then->ref( left );
+            if_then->ref( node );
+            cout << "Matched then with else: " << if_then << endl;
+        }
+        else if ( node->content == "else expression" ) {
+            auto left = relative_term_up_to_expression( bottom_semantics( node ).front()->refd, vector{ "if-then expression" } );
+            if ( left == nullptr || left->content != "if-then expression" ) {
+                ostringstream str;
+                str << "ERROR: no if-then expression at left of " << node;
+                cout << str.str() << endl;
+                throw runtime_error( str.str() );
+            }
+
+            auto if_then_else = new Node(
+                "if-then-else expression",
+                TYPE::EXPRESSION,
+                left->source_pos
+            );
+            if_then_else->ref( left );
+            if_then_else->ref( node );
+            cout << "Matched else with if-then: " << if_then_else << endl;
+        }
     };
     pulse( root, on_node );
 }

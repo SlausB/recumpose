@@ -38,6 +38,10 @@ enum TYPE {
 
     /** Abstract construct which references operator and other terms or expressions.*/
     EXPRESSION,
+
+    IF,
+    THEN,
+    ELSE,
 };
 ostream & operator <<( ostream & os, const TYPE & o ) {
     switch ( o ) {
@@ -53,6 +57,9 @@ ostream & operator <<( ostream & os, const TYPE & o ) {
         case TYPE::ENTITY       : os << "ENTITY"       ; break;
         case TYPE::SEMANTIC     : os << "SEMANTIC"     ; break;
         case TYPE::EXPRESSION   : os << "EXPRESSION"   ; break;
+        case TYPE::IF           : os << "IF"           ; break;
+        case TYPE::THEN         : os << "THEN"         ; break;
+        case TYPE::ELSE         : os << "ELSE"         ; break;
     }
     return os;
 }

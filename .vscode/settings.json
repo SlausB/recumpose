@@ -68,6 +68,10 @@
         "typeinfo": "cpp",
         "*.ipp": "cpp",
         "unordered_set": "cpp",
-        "*.inc": "cpp"
+        "*.inc": "cpp",
+        "forward_list": "cpp",
+        "rope": "cpp",
+        "slist": "cpp",
+        "span": "cpp"
     }
 }

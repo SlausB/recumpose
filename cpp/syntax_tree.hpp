@@ -57,9 +57,6 @@ const vector< pair< string, OPERAND > > OperatorsDesc = {
     { "*"      , INFIX },
     { "/"      , INFIX },
 
-    { "->"     , INFIX },
-    { "<-"     , INFIX },
-
     { "if"     , RIGHT },
     { "then"   , RIGHT },
     { "else"   , RIGHT },
@@ -69,6 +66,9 @@ const vector< pair< string, OPERAND > > OperatorsDesc = {
     { "<="     , INFIX },
     { ">="     , INFIX },
     { "not"    , RIGHT },
+
+    { "->"     , INFIX },
+    { "<-"     , INFIX },
 
     { "include", RIGHT },
 

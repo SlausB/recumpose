@@ -402,7 +402,7 @@ auto check_rel_presence( const Node * from, const Node * term, const string & or
     }
 }
 
-auto consume_left( Node * op, Node * expr = nullptr ) {
+Node * consume_left( Node * op, Node * expr = nullptr ) {
     auto left = relative_term_up_to_expression( op->refd );
     check_rel_presence( op, left, "left" );
 
@@ -416,7 +416,7 @@ auto consume_left( Node * op, Node * expr = nullptr ) {
     expr->ref( left );
     return expr;
 }
-auto consume_right( Node * op, Node * expr = nullptr ) {
+Node * consume_right( Node * op, Node * expr = nullptr ) {
     auto right = relative_term_up_to_expression( op->refs );
     check_rel_presence( op, right, "right" );
 
@@ -430,9 +430,10 @@ auto consume_right( Node * op, Node * expr = nullptr ) {
     expr->ref( right );
     return expr;
 }
-void consume_infix( Node * op ) {
+Node * consume_infix( Node * op ) {
     auto expr = consume_left( op );
     consume_right( op, expr );
+    return expr;
 }
 
 void match_semantics(
@@ -448,16 +449,27 @@ void match_semantics(
 
         //operators consume their operands:
         for ( const auto & op : ops ) {
+            Node * expr = nullptr;
+
             switch ( Operands.at( op->content ) ) {
                 case OPERAND::INFIX:
-                    consume_infix( op );
+                    expr = consume_infix( op );
                     break;
                 case OPERAND::LEFT:
-                    consume_left( op );
+                    expr = consume_left( op );
                     break;
                 case OPERAND::RIGHT:
-                    consume_right( op );
+                    expr = consume_right( op );
                     break;
+            }
+
+            if ( expr == nullptr ) {
+                const string error = string( "ERROR: operator " ) + op->content + " was NOT matched.";
+                cout << error << endl;
+                throw runtime_error( error );
+            }
+            else {
+                cout << "Operator " << op->content << " at " << op->source_pos << " successfully matched." << endl;
             }
         }
 

@@ -218,6 +218,10 @@ struct Node {
         refs.insert( target );
         target->refd.insert( this );
     }
+    void unref( Node * target ) {
+        refs.erase( target );
+        target->refd.erase( this );
+    }
     /** Returns first occurence of Node with specified TYPE which references this Node.*/
     Node * parent( const TYPE & type ) {
         for ( auto & parent : refd ) {

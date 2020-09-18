@@ -485,7 +485,15 @@ auto bottom_semantics( Node * node ) {
     return bottom;
 }
 
-void connect_ifs( Node * root ) {
+void reglue_parent_expr( Node * node, Node * to ) {
+    auto parent = node->parent( TYPE::EXPRESSION );
+    if ( parent != nullptr ) {
+        parent->unref( node );
+        parent->ref( to );
+    }
+}
+
+void merge_ifs( Node * root ) {
     const auto & on_node = []( Node * node ) {
         if ( ! node->type( TYPE::EXPRESSION ) )
             return;
@@ -529,6 +537,10 @@ void connect_ifs( Node * root ) {
                 TYPE::EXPRESSION,
                 left->source_pos
             );
+
+            //reglue "if" expression to this new one:
+            reglue_parent_expr( left, if_then );
+
             if_then->ref( left );
             if_then->ref( node );
             cout << "Matched then with else: " << if_then << endl;
@@ -547,6 +559,10 @@ void connect_ifs( Node * root ) {
                 TYPE::EXPRESSION,
                 left->source_pos
             );
+
+            //reglue "if-then" expression to this new one:
+            reglue_parent_expr( left, if_then_else );
+
             if_then_else->ref( left );
             if_then_else->ref( node );
             cout << "Matched else with if-then: " << if_then_else << endl;
@@ -659,7 +675,7 @@ auto parse_source( const string & file_name ) {
         match_semantics( cache );
     }
 
-    connect_ifs( root );
+    merge_ifs( root );
     match_right_all_files( root );
 
     return root;

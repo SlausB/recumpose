@@ -681,22 +681,6 @@ auto parse_source( const string & file_name ) {
     return root;
 }
 
-auto print_symmetries( Node * root ) {
-    const auto & on_sym = [&]( Node * sym_node ) {
-        if ( ! sym_node->type( TYPE::EQUALITY ) )
-            return true;
-        
-        auto line_node = closest( sym_node, TYPE::LINE );
-        cout << "Line " << line_node->source_pos.line << " has such symmetries:" << endl;
-        for ( const auto & ref : sym_node->refs ) {
-            if ( ref->type( TYPE::EXPRESSION ) )
-                cout << "    " << ref->content << endl;
-        }
-        return true;
-    };
-    pulse( root, on_sym );
-}
-
 void print_file( const string & file_name ) {
     ifstream file( file_name );
     cout << "Source \"" << file_name << "\" input file:" << endl;
@@ -710,17 +694,70 @@ void print_file( const string & file_name ) {
     cout << "================================================" << endl;
 }
 
+void spawn_symmetry( Node * o, Node * a ) {
+    auto o_p = o->parent( TYPE::EQUALITY );
+    auto a_p = a->parent( TYPE::EQUALITY );
+    if ( o_p != nullptr && a_p != nullptr )
+        return;
+    if ( o_p == nullptr && a_p == nullptr ) {
+        cout << "Spawning symmetry for " << o->content << endl;
+        auto sym = new Node(
+            o->content + " symmetry",
+            TYPE::EQUALITY,
+            //TODO: probably still should implement SourcePos merging (supporting even cross-file merge) ...
+            o->source_pos
+        );
+        sym->ref( o );
+        sym->ref( a );
+        return;
+    }
+    if ( o_p == nullptr )
+        a_p->ref( o );
+    else
+        o_p->ref( a );
+}
+void spawn_symmetries( Node * root ) {
+    const auto & on_term = [&]( Node * term ) {
+        if ( ! term->type( TYPE::TERM ) )
+            return;
+        
+        const auto & on_o_term = [&]( Node * o_term ) {
+            if ( ! o_term->type( TYPE::TERM ) )
+                return;
+            if ( o_term == term )
+                return;
+            
+            if ( o_term->content == term->content )
+                spawn_symmetry( o_term, term );
+        };
+        pulse( root, on_o_term );
+    };
+    pulse( root, on_term );
+}
+void print_symmetries( Node * root ) {
+    const auto & on_node = [&]( Node * node ) {
+        if ( node->type( TYPE::EQUALITY ) ) {
+            cout << "Symmetries of " << node->content << ":" << endl;
+            for ( auto & ref : node->refs ) {
+                cout << "    " << ref->source_pos << endl;
+            }
+        }
+    };
+    pulse( root, on_node );
+}
+
 auto parse( const string & file_name )
 {
     print_file( file_name );
     auto root = parse_source( file_name );
     if ( root == nullptr )
         return;
-    print_lines( root );
-
-    print_symmetries( root );
 
     plot( root, set{ TYPE::EXPRESSION, TYPE::TERM }, "semantics" );
+
+    //TODO: spawn equalities (symmetries) based on TERMs names and draw dependency graph to actually finally start doing the math ...
+    spawn_symmetries( root );
+    print_symmetries( root );
 
     cout << "Done." << endl;
 }

@@ -153,25 +153,6 @@ void parse_comments( Node * root ) {
     remove_empty_lines( root );
 }
 
-/** Spawn CHAR Nodes for every character of specified Operator and connect it with both OPERATOR and LINE Nodes.*/
-void spawn_op_chars(
-    const auto & op,
-    Node * op_node,
-    Node * line_node
-) {
-    int32_t disp = 0;
-    for ( char ch : op ) {
-        auto ch_node = new Node(
-            string( 1, ch ),
-            TYPE::CHAR,
-            op_node->source_pos.disp( disp, 1 )
-        );
-        op_node->ref( ch_node );
-        line_node->ref( ch_node );
-        ++ disp;
-    }
-}
-
 /** Returns true if specified string contains of alphabetic characters only.*/
 bool is_alpha_string( const string & s ) {
     for ( const auto ch : s ) {
@@ -179,6 +160,17 @@ bool is_alpha_string( const string & s ) {
             return false;
     }
     return true;
+}
+
+/** Returns true if specified SourcePos intersects with any existing element on specified LINE.*/
+bool intersects_any_on_line( const Node * line, const SourcePos & s ) {
+    for ( auto line_el : line->refs ) {
+        if ( line_el->type == TYPE::SOURCE_FILE || line_el->type == TYPE::LINE )
+            continue;
+        if ( line_el->source_pos.intersects( s, false ) )
+            return true;
+    }
+    return false;
 }
 
 bool match_operator(
@@ -191,12 +183,8 @@ bool match_operator(
     if ( r == string::npos )
         return false;
     
-    for ( auto line_el : line_node->refs ) {
-        if ( line_el->type == TYPE::SOURCE_FILE || line_el->type == TYPE::LINE )
-            continue;
-        if ( line_el->source_pos.intersects( SourcePos( line_el->source_pos.line, r + 1, r + 1 + op.size() ), false ) )
-            return false;
-    }
+    if ( intersects_any_on_line( line_node, line_node->source_pos.disp( r, op.size() ) ) )
+        return false;
 
     //deny matching if literal operator has other literals around:
     if (
@@ -228,7 +216,6 @@ bool match_operator(
     );
     cout << "Operator found: " << op << " at " << op_node->source_pos << endl;
     line_node->ref( op_node );
-    spawn_op_chars( op, op_node, line_node );
     caret = r + op.size();
     return true;
 }
@@ -264,11 +251,7 @@ void match_terms( Node * root ) {
                 ! isalnum( line_node->content.at( caret ) )
                 ||
                 //check that not yet an operator:
-                check_char(
-                    root,
-                    TYPE::OPERATOR,
-                    line_node->source_pos.disp( caret, 1 )
-                )
+                intersects_any_on_line( line_node, line_node->source_pos.disp( caret, 1 ) )
             ) {
                 const auto length = caret - seq_start;
                 if ( length > 0 ) {
@@ -436,6 +419,21 @@ Node * consume_infix( Node * op ) {
     return expr;
 }
 
+void match_entities( Node * file ) {
+    set< Node * > top_level_set;
+    const auto & on_node = [&]( Node * node ) {
+        //if top level expression:
+        if ( find_types( node->refd, vector{ TYPE::EXPRESSION, TYPE::ENTITY } ) == nullptr )
+            top_level_set.insert( node );
+    };
+    pulse( file, on_node, false, set{ TYPE::SOURCE_FILE } );
+
+    cout << "Top level EXPRESSIONs of file " << file->content << ":" << endl;
+    for ( const auto & expr : top_level_set ) {
+        cout << "    " << expr->content << " at " << expr->source_pos << endl;
+    }
+}
+
 void match_semantics(
     map< Node *, FileCache > & cache
 ) {
@@ -473,15 +471,15 @@ void match_semantics(
             }
         }
 
-        //remaining terms are Entities:
+        /*//remaining terms are Entities:
+        list< Node * > entities;
         for ( auto entity : file.second.terms ) {
             auto parent_expr = ultimate_parent_expression( entity );
-            //if not an entity (thus was consumed by some operator):
-            if ( parent_expr != entity )
-                continue;
-            //TODO:
-            //consume_right( entity );
-        }
+            //if not an entity (thus was consumed by some operator and now is part of EXPRESSION):
+            if ( parent_expr == entity )
+                entities.push_back( entity );
+        }*/
+        match_entities( file.first );
     }
 }
 

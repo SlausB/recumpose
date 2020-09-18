@@ -18,7 +18,6 @@ using namespace std;
 enum TYPE {
     SOURCE_FILE,
     LINE,
-    CHAR,
 
     TERM,
 
@@ -337,31 +336,6 @@ void print_lines( Node * root ) {
         return true;
     };
     pulse( root, print );
-}
-
-/** Returns true if character participates in Node of specified TYPE.*/
-bool check_char(
-    Node * root,
-    const TYPE type,
-    const SourcePos & source_pos
-) {
-    bool does = false;
-    const auto & on_char = [&]( Node * char_node ) {
-        if ( char_node->type != TYPE::CHAR )
-            return true;
-        if ( char_node->source_pos == source_pos ) {
-            for ( const auto & red : char_node->refd ) {
-                if ( red->type == type ) {
-                    does = true;
-                    return false;
-                }
-            }
-            return false;
-        }
-        return true;
-    };
-    pulse( root, on_char );
-    return does;
 }
 
 

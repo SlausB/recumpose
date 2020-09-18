@@ -318,10 +318,12 @@ Node * closest( Node * center, const TYPE type ) {
     return result;
 }
 
-Node * find_type( auto & in, const TYPE type ) {
+Node * find_types( auto & in, const auto & types ) {
     for ( auto r : in ) {
-        if ( r->type == type )
-            return r;
+        for ( const auto & type : types ) {
+            if ( r->type == type )
+                return r;
+        }
     }
     return nullptr;
 }

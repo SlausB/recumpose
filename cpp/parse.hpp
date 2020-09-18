@@ -389,7 +389,7 @@ Node * ultimate_parent_expression( Node * source ) {
 
 /** Obtain term at specified Node's relation up to it's most composed EXPRESSION.*/
 Node * relative_term_up_to_expression( auto & from ) {
-    auto rel = find_type( from, TYPE::TERM );
+    auto rel = find_types( from, vector{ TYPE::OPERATOR, TYPE::TERM } );
     if ( rel == nullptr )
         return nullptr;
     return ultimate_parent_expression( rel );

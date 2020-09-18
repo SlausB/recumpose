@@ -50,28 +50,19 @@ auto name( Node * node ) {
     return (uint64_t) (void const *) node;
 };
 
-auto plot( Node * root ) {
+template< typename PlotTypes >
+auto plot( Node * root, const PlotTypes & plot_types = {} ) {
     Plot p;
     map< uint64_t, string > labels;
 
-    const auto & should_plot = []( Node * node ) {
-        switch ( node->type ) {
-            case TYPE::LINE:
-            case TYPE::TERM:
-            case TYPE::OPERATOR:
-                return true;
-            default:
-                return false;
-        }
-        return false;
+    const auto & should_plot = [&]( Node * node ) {
+        return node->type( plot_types );
     };
     const auto & label = [&]( Node * node ) {
-        switch ( node->type ) {
-            case TYPE::LINE:
-                return string( "line " ) + to_string( node->source_pos.line );
-            default:
-                return node->content;
-        }
+        if ( node->type( TYPE::LINE ) )
+            return string( "line " ) + to_string( node->source_pos.line );
+        else
+            return node->content;
     };
 
     const auto & on_node = [&]( Node * node ) {

@@ -70,7 +70,7 @@ void remove_empty_lines( Node * root ) {
     set< Node * > remove;
 
     const auto & on_line = [&]( Node * line_node ) {
-        if ( line_node->type != TYPE::LINE )
+        if ( ! line_node->type( TYPE::LINE ) )
             return true;
         
         if ( only_whitespace( line_node->content ) ) {
@@ -93,7 +93,7 @@ void remove_empty_lines( Node * root ) {
 /** Detects comments and removes their content from lines.*/
 void parse_comments( Node * root ) {
     const auto & on_file = [&]( Node * file_node ) {
-        if ( file_node->type != TYPE::SOURCE_FILE )
+        if ( ! file_node->type( TYPE::SOURCE_FILE ) )
             return true;
         
         //TODO: properly handle comment matchers inside literals (there is no definition for literals yet anyway) ...
@@ -165,7 +165,7 @@ bool is_alpha_string( const string & s ) {
 /** Returns true if specified SourcePos intersects with any existing element on specified LINE.*/
 bool intersects_any_on_line( const Node * line, const SourcePos & s ) {
     for ( auto line_el : line->refs ) {
-        if ( line_el->type == TYPE::SOURCE_FILE || line_el->type == TYPE::LINE )
+        if ( line_el->type( set{ TYPE::SOURCE_FILE, TYPE::LINE } ) )
             continue;
         if ( line_el->source_pos.intersects( s, false ) )
             return true;
@@ -222,7 +222,7 @@ bool match_operator(
 
 void match_operators( Node * root ) {
     const auto & on_line = []( Node * line_node ){
-        if ( line_node->type != TYPE::LINE )
+        if ( ! line_node->type( TYPE::LINE ) )
             return true;
         
         for ( const auto & op : LongerOperators ) {
@@ -240,7 +240,7 @@ void match_operators( Node * root ) {
 
 void match_terms( Node * root ) {
     const auto & on_line = [&]( Node * line_node ) {
-        if ( line_node->type != TYPE::LINE )
+        if ( ! line_node->type( TYPE::LINE ) )
             return true;
         
         int32_t seq_start = 0;
@@ -281,7 +281,7 @@ void chain_terms_and_operators(
     map< Node *, FileCache > & cache
 ) {
     const auto & on_file = [&]( Node * file_node ) {
-        if ( file_node->type != TYPE::SOURCE_FILE )
+        if ( ! file_node->type( TYPE::SOURCE_FILE ) )
             return;
         
         //expression that is currently being parsed:
@@ -292,16 +292,16 @@ void chain_terms_and_operators(
             list< Node * > terms_and_ops;
 
             for ( auto & to_ref : line_node->refs ) {
-                if ( to_ref->type == TYPE::TERM || to_ref->type == TYPE::OPERATOR ) {
+                if ( to_ref->type( set{ TYPE::TERM, TYPE::OPERATOR } ) ) {
                     terms_and_ops.push_back( to_ref );
                 }
             }
 
             syntactic_position_sort( terms_and_ops );
             for ( auto & to : terms_and_ops ) {
-                if ( to->type == TYPE::TERM )
+                if ( to->type( TYPE::TERM ) )
                     cache[ file_node ].terms.push_back( to );
-                if ( to->type == TYPE::OPERATOR )
+                if ( to->type( TYPE::OPERATOR ) )
                     cache[ file_node ].operators.push_back( to );
 
                 if ( caret == nullptr ) {
@@ -418,31 +418,6 @@ Node * consume_infix( Node * op ) {
     return expr;
 }
 
-void match_right_all( Node * file ) {
-    set< Node * > top_level_set;
-    const auto & on_node = [&]( Node * node ) {
-        if ( node->type == TYPE::LINE || node->type == TYPE::SOURCE_FILE )
-            return;
-        //if NOT top level expression:
-        if ( find_types( node->refd, vector{ TYPE::EXPRESSION, TYPE::ENTITY } ) != nullptr ) {
-            cout << "    skipping node " << node << " because it's NOT top-level since it's referenced by " << find_types( node->refd, vector{ TYPE::EXPRESSION, TYPE::ENTITY } ) << endl;
-            return;
-        }
-        top_level_set.insert( node );
-    };
-    pulse( file, on_node, false, set{ TYPE::SOURCE_FILE } );
-
-    list< Node * > top_level_list;
-    for ( auto & n : top_level_set )
-        top_level_list.push_back( n );
-    syntactic_position_sort( top_level_list );
-
-    cout << "Top level semantic nodes of file " << file->content << " in syntactic order:" << endl;
-    for ( const auto & expr : top_level_list ) {
-        cout << "    " << expr << endl;
-    }
-}
-
 void match_semantics(
     map< Node *, FileCache > & cache
 ) {
@@ -470,7 +445,6 @@ void match_semantics(
                     break;
                 //will be matched later on:
                 case OPERAND::RIGHT_ALL:
-                    cout << "skipping matching operator " << op << " because it's RIGHT_ALL" << endl;
                     continue;
             }
 
@@ -485,17 +459,49 @@ void match_semantics(
                     cout << "    " << ref << endl;
             }
         }
-
-        /*//remaining terms are RIGHT_ALL operators or Entities:
-        list< Node * > entities;
-        for ( auto entity : file.second.terms ) {
-            auto parent_expr = ultimate_parent_expression( entity );
-            //if not an entity (thus was consumed by some operator and now is part of EXPRESSION):
-            if ( parent_expr == entity )
-                entities.push_back( entity );
-        }*/
-        match_right_all( file.first );
     }
+}
+
+void connect_ifs( Node * root ) {
+    const auto & on_node = []( Node * node ) {
+        if ( ! node->type( TYPE::EXPRESSION ) )
+            return;
+        
+        //TODO
+    };
+    pulse( root, on_node );
+}
+
+void match_right_all( Node * file ) {
+    set< Node * > top_level_set;
+    const auto & on_node = [&]( Node * node ) {
+        if ( node->type( set{ TYPE::LINE, TYPE::SOURCE_FILE } ) )
+            return;
+        //if NOT top level expression:
+        if ( find_types( node->refd, vector{ TYPE::EXPRESSION, TYPE::ENTITY } ) != nullptr ) {
+            cout << "    skipping node " << node << " because it's NOT top-level since it's referenced by " << find_types( node->refd, vector{ TYPE::EXPRESSION, TYPE::ENTITY } ) << endl;
+            return;
+        }
+        top_level_set.insert( node );
+    };
+    pulse( file, on_node, false, set{ TYPE::SOURCE_FILE } );
+
+    list< Node * > top_level_list;
+    for ( auto & n : top_level_set )
+        top_level_list.push_back( n );
+    syntactic_position_sort( top_level_list );
+
+    cout << "Top level semantic nodes of file " << file->content << " in syntactic order:" << endl;
+    for ( const auto & expr : top_level_list ) {
+        cout << "    " << expr << endl;
+    }
+}
+void match_right_all_files( Node * root ) {
+    const auto & on_file = []( Node * file_node ) {
+        if ( file_node->type( TYPE::SOURCE_FILE ) )
+            match_right_all( file_node );
+    };
+    pulse( root, on_file );
 }
 
 auto parse_source( const string & file_name ) {
@@ -508,22 +514,27 @@ auto parse_source( const string & file_name ) {
     match_operators( root );
     match_terms( root );
 
-    map< Node *, FileCache > cache;
-    chain_terms_and_operators( root, cache );
-    match_semantics( cache );
+    {
+        map< Node *, FileCache > cache;
+        chain_terms_and_operators( root, cache );
+        match_semantics( cache );
+    }
+
+    connect_ifs( root );
+    match_right_all_files( root );
 
     return root;
 }
 
 auto print_symmetries( Node * root ) {
     const auto & on_sym = [&]( Node * sym_node ) {
-        if ( sym_node->type != TYPE::EQUALITY )
+        if ( ! sym_node->type( TYPE::EQUALITY ) )
             return true;
         
         auto line_node = closest( sym_node, TYPE::LINE );
         cout << "Line " << line_node->source_pos.line << " has such symmetries:" << endl;
         for ( const auto & ref : sym_node->refs ) {
-            if ( ref->type == TYPE::EXPRESSION )
+            if ( ref->type( TYPE::EXPRESSION ) )
                 cout << "    " << ref->content << endl;
         }
         return true;
@@ -554,7 +565,7 @@ auto parse( const string & file_name )
 
     print_symmetries( root );
 
-    plot( root );
+    plot( root, set{ TYPE::LINE, TYPE::TERM, TYPE::OPERATOR } );
 
     cout << "Done." << endl;
 }

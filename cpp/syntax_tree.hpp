@@ -186,7 +186,7 @@ ostream & operator <<( ostream & os, const SourcePos & s ) {
 
 struct Node {
     string content;
-    TYPE type;
+    set< TYPE > types;
     SourcePos source_pos;
     /** Which other nodes this one references.*/
     set< Node * > refs;
@@ -197,7 +197,7 @@ struct Node {
         const auto & content,
         const auto & type,
         SourcePos source_pos
-    ): content(content), type(type), source_pos(source_pos)
+    ): content(content), types{type}, source_pos(source_pos)
     {}
     ~Node() {
         for ( auto & ref : refs )
@@ -214,7 +214,7 @@ struct Node {
     /** Returns first occurence of Node with specified TYPE which references this Node.*/
     Node * parent( const TYPE & type ) {
         for ( auto & parent : refd ) {
-            if ( parent->type == type )
+            if ( parent->type( type ) )
                 return parent;
         }
         return nullptr;
@@ -222,7 +222,7 @@ struct Node {
     Node * parent( const auto & types ) {
         for ( auto & parent : refd ) {
             for ( const auto & type : types )
-                if ( parent->type == type )
+                if ( parent->type( type ) )
                     return parent;
         }
         return nullptr;
@@ -230,14 +230,34 @@ struct Node {
     /** Returns first occurense of Node with specified TYPE which current Node references.*/
     Node * child( const TYPE & type ) {
         for ( auto & child : refs ) {
-            if ( child->type == type )
+            if ( child->type( type ) )
                 return child;
         }
         return nullptr;
     }
+
+    /** Returns true if has specified type.*/
+    bool type( const TYPE & type ) {
+        return types.find( type ) != types.end();
+    }
+    bool type( const auto & types ) {
+        for ( const auto & t : types ) {
+            if ( type( t ) )
+                return true;
+        }
+        return false;
+    }
 };
 ostream & operator <<( ostream & os, const Node * node ) {
-    os << "{ " << node->type << " \"" << node->content << "\" at " << node->source_pos << " }";
+    os << "{ ";
+    bool printed_type = false;
+    for ( const auto & type : node->types ) {
+        if ( printed_type )
+            cout << "|";
+        printed_type = true;
+        os << type;
+    }
+    os << " \"" << node->content << "\" at " << node->source_pos << " }";
     return os;
 }
 /** Used to reason about nodes relative positioning in line.*/
@@ -273,21 +293,21 @@ bool equal_indentation( Node * one_line, Node * another_line ) {
 }
 
 /** Breadth first iteration over AST.
-@param types_filter set of TYPEs over which on traverse should follow. If empty traverse follows over any TYPEs passing those specified in types_pass.
-@param types_pass set of TYPEs over which traverse should NOT follow. If empty traverse follows over any TYPEs specified in types_filter.
+@param types_filter set of TYPEs over which on traverse should follow. If empty traverse follows over any TYPEs passing those specified in types_wall.
+@param types_wall set of TYPEs over which traverse should NOT follow. If empty traverse follows over any TYPEs specified in types_filter.
 */
 template<
     bool Refs = true,
     bool Refd = true,
     typename TypesFilter = bool,
-    typename TypesPass = bool,
+    typename TypesWall = bool,
     typename Func
 >
 void pulse(
     Node * root,
     Func const & on_node,
     TypesFilter const & types_filter = false,
-    TypesPass const & types_pass = false
+    TypesWall const & types_wall = false
 ) {
     set< Node * > visited;
     visited.insert( root );
@@ -312,13 +332,13 @@ void pulse(
             for ( auto next : array ) {
                 //skip if filter specified and doesn't have current TYPE:
                 if constexpr ( ! is_same_v< TypesFilter, bool > ) {
-                    if ( types_filter.find( next->type ) == types_filter.end() )
+                    if ( ! next->type( types_filter ) )
                         continue;
                 }
 
                 //skip if pass specified and does have current TYPE:
-                if constexpr ( ! is_same_v< TypesPass, bool > ) {
-                    if ( types_pass.find( next->type ) != types_pass.end() )
+                if constexpr ( ! is_same_v< TypesWall, bool > ) {
+                    if ( next->type( types_wall ) )
                         continue;
                 }
 
@@ -338,7 +358,7 @@ void pulse(
 Node * closest( Node * center, const TYPE type ) {
     Node * result = nullptr;
     const auto & on_node = [&]( Node * node ) {
-        if ( node->type == type ) {
+        if ( node->type( type ) ) {
             result = node;
             return false;
         }
@@ -350,10 +370,8 @@ Node * closest( Node * center, const TYPE type ) {
 
 Node * find_types( auto & in, const auto & types ) {
     for ( auto r : in ) {
-        for ( const auto & type : types ) {
-            if ( r->type == type )
-                return r;
-        }
+        if ( r->type( types ) )
+            return r;
     }
     return nullptr;
 }
@@ -361,7 +379,7 @@ Node * find_types( auto & in, const auto & types ) {
 void print_lines( Node * root ) {
     cout << "Source split into lines:" << endl;
     const auto & print = []( Node * node ) {
-        if ( node->type != TYPE::LINE )
+        if ( ! node->type( TYPE::LINE ) )
             return true;
         cout << "    " << node->source_pos.line << ": chars " << node->source_pos.char_start << "-" << node->source_pos.char_end << ": " << node->content << endl;
         return true;

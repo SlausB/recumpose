@@ -180,7 +180,7 @@ struct SourcePos {
     auto operator<=>(const SourcePos&) const = default;
 };
 ostream & operator <<( ostream & os, const SourcePos & s ) {
-    os << '{' << s.line << ':' << s.char_start << '-' << s.char_end << '}';
+    os << "{\"" << s.file << "\":" << s.line << ':' << s.char_start << '-' << s.char_end << '}';
     return os;
 }
 
@@ -236,6 +236,10 @@ struct Node {
         return nullptr;
     }
 };
+ostream & operator <<( ostream & os, const Node * node ) {
+    os << "{ " << node->type << " \"" << node->content << "\" at " << node->source_pos << " }";
+    return os;
+}
 /** Used to reason about nodes relative positioning in line.*/
 struct NodeHandler {
     Node * node;
@@ -270,7 +274,7 @@ bool equal_indentation( Node * one_line, Node * another_line ) {
 
 /** Breadth first iteration over AST.
 @param types_filter set of TYPEs over which on traverse should follow. If empty traverse follows over any TYPEs passing those specified in types_pass.
-@param types_pass set of TYPEs over which traverse shouuld NOT follow. If empty traverse follows over any TYPEs specified in types_filter.
+@param types_pass set of TYPEs over which traverse should NOT follow. If empty traverse follows over any TYPEs specified in types_filter.
 */
 template<
     bool Refs = true,

@@ -362,11 +362,10 @@ auto semantic_operators_order( const Ops & ops ) {
 }
 
 Node * ultimate_parent_expression( Node * source ) {
-    const set< TYPE > pass{ TYPE::LINE, TYPE::SOURCE_FILE };
     const auto & on_parent = [&]( Node * parent ) {
         source = parent;
     };
-    pulse< false >( source, on_parent, false, pass );
+    pulse< false >( source, on_parent, set{ TYPE::EXPRESSION } );
     return source;
 }
 
@@ -425,8 +424,10 @@ void match_right_all( Node * file ) {
         if ( node->type == TYPE::LINE || node->type == TYPE::SOURCE_FILE )
             return;
         //if NOT top level expression:
-        if ( find_types( node->refd, vector{ TYPE::EXPRESSION, TYPE::ENTITY } ) != nullptr )
+        if ( find_types( node->refd, vector{ TYPE::EXPRESSION, TYPE::ENTITY } ) != nullptr ) {
+            cout << "    skipping node " << node << " because it's NOT top-level since it's referenced by " << find_types( node->refd, vector{ TYPE::EXPRESSION, TYPE::ENTITY } ) << endl;
             return;
+        }
         top_level_set.insert( node );
     };
     pulse( file, on_node, false, set{ TYPE::SOURCE_FILE } );
@@ -436,9 +437,9 @@ void match_right_all( Node * file ) {
         top_level_list.push_back( n );
     syntactic_position_sort( top_level_list );
 
-    cout << "Top level EXPRESSIONs of file " << file->content << " in syntactic order:" << endl;
+    cout << "Top level semantic nodes of file " << file->content << " in syntactic order:" << endl;
     for ( const auto & expr : top_level_list ) {
-        cout << "    " << expr->type << " \"" << expr->content << "\" at " << expr->source_pos << endl;
+        cout << "    " << expr << endl;
     }
 }
 
@@ -469,6 +470,7 @@ void match_semantics(
                     break;
                 //will be matched later on:
                 case OPERAND::RIGHT_ALL:
+                    cout << "skipping matching operator " << op << " because it's RIGHT_ALL" << endl;
                     continue;
             }
 
@@ -478,7 +480,9 @@ void match_semantics(
                 throw runtime_error( error );
             }
             else {
-                cout << "Operator " << op->content << " at " << op->source_pos << " successfully matched." << endl;
+                cout << "Operator " << op << " successfully matched into EXPRESSION " << expr << ":" << endl;
+                for ( const auto & ref : expr->refs )
+                    cout << "    " << ref << endl;
             }
         }
 

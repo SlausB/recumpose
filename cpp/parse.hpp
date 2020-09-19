@@ -584,7 +584,7 @@ Node * find_line_from_expression( Node * expr ) {
     return result;
 }
 
-void consume_right_until_indentation( Node * from, auto & syntactic_it, const string & name, const auto & until ) {
+Node * consume_right_until_indentation( Node * from, auto & syntactic_it, const string & name, const auto & until ) {
     Node * line = find_line_from_expression( from );
     Node * rolling = nullptr;
     while ( syntactic_it != until ) {
@@ -609,6 +609,7 @@ void consume_right_until_indentation( Node * from, auto & syntactic_it, const st
         rolling->ref( right );
         ++ syntactic_it;
     }
+    return rolling;
 }
 
 void match_right_all( Node * file ) {
@@ -639,13 +640,20 @@ void match_right_all( Node * file ) {
 
         //RIGHT_ALL operand:
         if ( tl->type( TYPE::OPERATOR ) ) {
-            consume_right_until_indentation( tl, tl_it, "operator", top_level_list.end() );
+            auto op = consume_right_until_indentation( tl, tl_it, "operator", top_level_list.end() );
+            if ( tl->content == "inputs" )
+                op->types.insert( TYPE::INPUTS );
+            else if ( tl->content == "outputs" )
+                op->types.insert( TYPE::OUTPUTS );
+            else
+                cout << "ERROR: undefined RIGHT_ALL operator." << endl;
             continue;
         }
 
         //entity:
         if ( tl->type( TYPE::TERM ) ) {
-            consume_right_until_indentation( tl, tl_it, "entity", top_level_list.end() );
+            auto entity = consume_right_until_indentation( tl, tl_it, "entity", top_level_list.end() );
+            entity->types.insert( TYPE::ENTITY );
             //TODO: maybe recursively? To handle potential entities defined as part of bigger entities (does it make any sense though?) ...
             continue;
         }
@@ -694,53 +702,43 @@ void print_file( const string & file_name ) {
     cout << "================================================" << endl;
 }
 
-void spawn_symmetry( Node * o, Node * a ) {
-    auto o_p = o->parent( TYPE::EQUALITY );
-    auto a_p = a->parent( TYPE::EQUALITY );
-    if ( o_p != nullptr && a_p != nullptr )
-        return;
-    if ( o_p == nullptr && a_p == nullptr ) {
-        cout << "Spawning symmetry for " << o->content << endl;
-        auto sym = new Node(
-            o->content + " symmetry",
-            TYPE::EQUALITY,
-            //TODO: probably still should implement SourcePos merging (supporting even cross-file merge) ...
-            o->source_pos
-        );
-        sym->ref( o );
-        sym->ref( a );
-        return;
-    }
-    if ( o_p == nullptr )
-        a_p->ref( o );
-    else
-        o_p->ref( a );
-}
-void spawn_symmetries( Node * root ) {
+void merge_occurences( Node * root ) {
+    set< Node * > remove;
+    map< string, Node * > terms;
+
     const auto & on_term = [&]( Node * term ) {
         if ( ! term->type( TYPE::TERM ) )
             return;
         
-        const auto & on_o_term = [&]( Node * o_term ) {
-            if ( ! o_term->type( TYPE::TERM ) )
-                return;
-            if ( o_term == term )
-                return;
-            
-            if ( o_term->content == term->content )
-                spawn_symmetry( o_term, term );
-        };
-        pulse( root, on_o_term );
+        auto existing = terms[ term->content ];
+        if ( existing == nullptr ) {
+            terms[ term->content ] = term;
+            return;
+        }
+
+        //move all expressions that reference one of these occurences into another one:
+        cout << "Merge occurence " << term << " into " << existing << endl;
+        for ( auto expr : term->refd ) {
+            if ( expr->type( TYPE::EXPRESSION ) ) {
+                cout << "    " << expr << " -> " << existing << endl;
+                expr->ref( existing );
+            }
+        }
+        remove.insert( term );
     };
     pulse( root, on_term );
+
+    for ( auto & r : remove )
+        delete r;
 }
-void print_symmetries( Node * root ) {
+
+/** Spawn another graph where if Node "a" depends on Node "b" then "a" references "b".*/
+void dependency_flow( Node * root ) {
+    set< Node * > graph;
+    map< string, Node * > term_to_node;
     const auto & on_node = [&]( Node * node ) {
-        if ( node->type( TYPE::EQUALITY ) ) {
-            cout << "Symmetries of " << node->content << ":" << endl;
-            for ( auto & ref : node->refs ) {
-                cout << "    " << ref->source_pos << endl;
-            }
+        if ( node->type( TYPE::EXPRESSION ) ) {
+
         }
     };
     pulse( root, on_node );
@@ -755,9 +753,9 @@ auto parse( const string & file_name )
 
     plot( root, set{ TYPE::EXPRESSION, TYPE::TERM }, "semantics" );
 
-    //TODO: spawn equalities (symmetries) based on TERMs names and draw dependency graph to actually finally start doing the math ...
-    spawn_symmetries( root );
-    print_symmetries( root );
+    merge_occurences( root );
+
+    plot( root, set{ TYPE::EXPRESSION, TYPE::TERM, TYPE::ENTITY }, "expressions" );
 
     cout << "Done." << endl;
 }

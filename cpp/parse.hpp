@@ -733,7 +733,7 @@ void merge_occurences( Node * root ) {
         //move all expressions that reference one of these occurences into another one:
         cout << "Merge occurence " << term << " into " << existing << endl;
         for ( auto expr : term->refd ) {
-            if ( expr->type( TYPE::EXPRESSION ) ) {
+            if ( expr->type( set{ TYPE::EXPRESSION, TYPE::NONABELIAN } ) ) {
                 cout << "    " << expr << " -> " << existing << endl;
                 expr->ref( existing );
             }
@@ -766,9 +766,8 @@ auto parse( const string & file_name )
         return;
 
     plot( root, set{ TYPE::EXPRESSION, TYPE::TERM, TYPE::NONABELIAN }, "semantics" );
-
-    //TODO: breaks non-abelian composition:
-    //merge_occurences( root );
+    
+    merge_occurences( root );
 
     plot( root, set{ TYPE::EXPRESSION, TYPE::TERM, TYPE::ENTITY, TYPE::NONABELIAN }, "expressions" );
 

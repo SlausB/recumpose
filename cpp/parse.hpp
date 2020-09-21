@@ -394,7 +394,7 @@ auto check_rel_presence( const Node * from, const Node * term, const string & or
     }
 }
 
-Node * consume_left( Node * op, Node * expr = nullptr ) {
+Node * consume_left( Node * op, Node *& expr ) {
     auto left = relative_term_up_to_expression( op->refd );
     check_rel_presence( op, left, "left" );
 
@@ -406,9 +406,10 @@ Node * consume_left( Node * op, Node * expr = nullptr ) {
         );
     expr->ref( op );
     expr->ref( left );
-    return expr;
+
+    return left;
 }
-Node * consume_right( Node * op, Node * expr = nullptr ) {
+Node * consume_right( Node * op, Node *& expr ) {
     auto right = relative_term_up_to_expression( op->refs );
     check_rel_presence( op, right, "right" );
 
@@ -420,11 +421,24 @@ Node * consume_right( Node * op, Node * expr = nullptr ) {
         );
     expr->ref( op );
     expr->ref( right );
-    return expr;
+
+    return right;
 }
 Node * consume_infix( Node * op ) {
-    auto expr = consume_left( op );
+    Node * expr = nullptr;
+    auto left = consume_left( op, expr );
     consume_right( op, expr );
+    
+    if ( NonAbelians.at( op->content ) == NONABELIAN_TYPE::NON_ABELIAN ) {
+        auto nonabelian = new Node(
+            op->content + " nonabelian",
+            TYPE::NONABELIAN,
+            op->source_pos
+        );
+        expr->ref( nonabelian );
+        nonabelian->ref( left );
+    }
+
     return expr;
 }
 
@@ -448,10 +462,10 @@ void match_semantics(
                     expr = consume_infix( op );
                     break;
                 case OPERAND::LEFT:
-                    expr = consume_left( op );
+                    consume_left( op, expr );
                     break;
                 case OPERAND::RIGHT:
-                    expr = consume_right( op );
+                    consume_right( op, expr );
                     break;
                 //will be matched later on:
                 case OPERAND::RIGHT_ALL:
@@ -751,11 +765,12 @@ auto parse( const string & file_name )
     if ( root == nullptr )
         return;
 
-    plot( root, set{ TYPE::EXPRESSION, TYPE::TERM }, "semantics" );
+    plot( root, set{ TYPE::EXPRESSION, TYPE::TERM, TYPE::NONABELIAN }, "semantics" );
 
-    merge_occurences( root );
+    //TODO: breaks non-abelian composition:
+    //merge_occurences( root );
 
-    plot( root, set{ TYPE::EXPRESSION, TYPE::TERM, TYPE::ENTITY }, "expressions" );
+    plot( root, set{ TYPE::EXPRESSION, TYPE::TERM, TYPE::ENTITY, TYPE::NONABELIAN }, "expressions" );
 
     cout << "Done." << endl;
 }

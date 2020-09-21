@@ -42,6 +42,9 @@ enum TYPE {
     IF,
     THEN,
     ELSE,
+
+    /** Just to break the symmetry of certain Operators (EXPRESSIONs) which have notion of "left" and "right".*/
+    NONABELIAN,
 };
 ostream & operator <<( ostream & os, const TYPE & o ) {
     switch ( o ) {
@@ -60,6 +63,7 @@ ostream & operator <<( ostream & os, const TYPE & o ) {
         case TYPE::IF           : os << "IF"           ; break;
         case TYPE::THEN         : os << "THEN"         ; break;
         case TYPE::ELSE         : os << "ELSE"         ; break;
+        case TYPE::NONABELIAN   : os << "NONABELIAN"   ; break;
     }
     return os;
 }
@@ -80,28 +84,42 @@ ostream & operator <<( ostream & os, const OPERAND & o ) {
     return os;
 }
 
+enum NONABELIAN_TYPE {
+    ABELIAN,
+    NON_ABELIAN,
+};
+
+struct OperatorDesc {
+    string text;
+    OPERAND operand;
+    NONABELIAN_TYPE nonabelian = NONABELIAN_TYPE::ABELIAN;
+
+    OperatorDesc( const string & text, const OPERAND & operand, const NONABELIAN_TYPE & nonabelian = NONABELIAN_TYPE::ABELIAN ): text(text), operand(operand), nonabelian(nonabelian) {}
+};
+
 /** In semantics matching order.*/
-const vector< pair< string, OPERAND > > OperatorsDesc = {
+const vector< OperatorDesc > OperatorsDesc = {
+    //OperatorDesc( "!", RIGHT ),
     { "!"      , RIGHT },
     { ":"      , INFIX },
 
     { "+"      , INFIX },
-    { "-"      , INFIX },
+    { "-"      , INFIX, NON_ABELIAN },
     { "*"      , INFIX },
-    { "/"      , INFIX },
+    { "/"      , INFIX, NON_ABELIAN },
 
     { "not"    , RIGHT },
-    { "<"      , INFIX },
+    { "<"      , INFIX, NON_ABELIAN },
     { "=="     , INFIX },
-    { ">"      , INFIX },
-    { "<="     , INFIX },
-    { ">="     , INFIX },
+    { ">"      , INFIX, NON_ABELIAN },
+    { "<="     , INFIX, NON_ABELIAN },
+    { ">="     , INFIX, NON_ABELIAN },
     { "if"     , RIGHT },
     { "then"   , RIGHT },
     { "else"   , RIGHT },
 
-    { "->"     , INFIX },
-    { "<-"     , INFIX },
+    { "->"     , INFIX, NON_ABELIAN },
+    { "<-"     , INFIX, NON_ABELIAN },
 
     { "include", RIGHT_ALL },
 
@@ -110,12 +128,12 @@ const vector< pair< string, OPERAND > > OperatorsDesc = {
 
     { "="      , INFIX },
 
-    { "∘"      , INFIX },
-    { "∘="     , INFIX },
-    { "∘+"     , INFIX },
-    { "@"      , INFIX },
-    { "@="     , INFIX },
-    { "@+"     , INFIX },
+    { "∘"      , INFIX, NON_ABELIAN },
+    { "∘="     , INFIX, NON_ABELIAN },
+    { "∘+"     , INFIX, NON_ABELIAN },
+    { "@"      , INFIX, NON_ABELIAN },
+    { "@="     , INFIX, NON_ABELIAN },
+    { "@+"     , INFIX, NON_ABELIAN },
 
     { "("      , RIGHT },
     { ")"      , LEFT  },
@@ -124,18 +142,24 @@ const vector< pair< string, OPERAND > > OperatorsDesc = {
 
 const vector< string > Operators = []{
     vector< string > data;
-    for ( const auto & pair : OperatorsDesc ) { // or with c++20 : ranges & use set's InputIt constructor
-        data.push_back( pair.first );
+    for ( const auto & desc : OperatorsDesc ) { // or with c++20 : ranges & use set's InputIt constructor
+        data.push_back( desc.text );
     }
     return data;
 }();
-
 const map< string, OPERAND > Operands = []{
     map< string, OPERAND > data;
-    for ( const auto & pair : OperatorsDesc ) {
-        data[ pair.first ] = pair.second;
+    for ( const auto & desc : OperatorsDesc ) {
+        data[ desc.text ] = desc.operand;
     }
     return data;
+}();
+const map< string, NONABELIAN_TYPE > NonAbelians = []{
+    map< string, NONABELIAN_TYPE > na;
+    for ( const auto & desc : OperatorsDesc ) {
+        na[ desc.text ] = desc.nonabelian;
+    }
+    return na;
 }();
 
 /** Operators sorted from long to short.*/

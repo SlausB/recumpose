@@ -16,7 +16,8 @@ struct Entity {};
 
 int main() {
     //parse( "../samples/program_1.rcl" );
-    parse( "../samples/falcon.rcl" );
+    //parse( "../samples/falcon.rcl" );
+    parse( "../samples/square_equation.rcl" );
     //pulse_ast_with_numbered_waves_by_composing_layered_waves_on_entities();
 
     //every composition needs to be reversible (so to define sqrt() function you'll have to define complex numbers and thus recompose (+),(-),(*), etc)
@@ -36,9 +37,11 @@ a ∘= b + c
 a ∘+ g + 1
 */
 
-//when function (program/endity/...) is composed on top of itself, it means at least that it takes the same type as it returns (where type is the space and values are points in that space). But the result of such composition is the different type ofc. Implementation of computation on top of that composition (on top of expression of composition) spawns new instance of type (where it's called "value") and instance is the same on the left side of composition and the right side of composion (same besides having just similar value). Thus, the moment of such instantiation requires permorming the branching of the whole composition graph.
+//when function (program/entity/...) is composed on top of itself, it means at least that it takes the same type as it returns (where type is the space and values are points in that space). But the result of such composition is the different type ofc. Implementation of computation on top of that composition (on top of expression of composition) spawns new instance of type (where it's called "value") and instance is the same on the left side of composition and the right side of composion (same besides having just similar value). Thus, the moment of such instantiation requires permorming the branching of the whole composition graph.
 
 //one might consider this language as detangling of problem graph into physical machine memory (which programmer always has to manage)
 
 //Composition might have a name. Such name might be used for another composition. Composition IS the Type. Immunal approach allows removing any Composition from program. Type is space to which values of that Type belong. Thus, immune state of program defines it's Shape.
 //speculation: program execution, then, might be the transition from one Shape to another.
+
+// array-like data structures are handles as values of Types, but in such a way that due to execution lazy-ness values are still hanging around (not getting shrunk to a single presentation for immunity purposes). Thus, execution model must be included in any final program recumpose produces (another exposure of data-code equivalence).

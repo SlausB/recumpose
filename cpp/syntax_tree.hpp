@@ -20,6 +20,7 @@ enum TYPE {
     LINE,
 
     TERM,
+    NUMBER,
 
     OPERATOR,
 
@@ -51,6 +52,7 @@ ostream & operator <<( ostream & os, const TYPE & o ) {
         case TYPE::SOURCE_FILE  : os << "SOURCE_FILE"  ; break;
         case TYPE::LINE         : os << "LINE"         ; break;
         case TYPE::TERM         : os << "TERM"         ; break;
+        case TYPE::NUMBER       : os << "NUMBER"       ; break;
         case TYPE::OPERATOR     : os << "OPERATOR"     ; break;
         case TYPE::PARENTH_BLOCK: os << "PARENTH_BLOCK"; break;
         case TYPE::INPUTS       : os << "INPUTS"       ; break;

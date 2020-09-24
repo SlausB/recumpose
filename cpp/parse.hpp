@@ -746,16 +746,134 @@ void merge_occurences( Node * root ) {
         delete r;
 }
 
-/** Spawn another graph where if Node "a" depends on Node "b" then "a" references "b".*/
-void dependency_flow( Node * root ) {
-    set< Node * > graph;
-    map< string, Node * > term_to_node;
-    const auto & on_node = [&]( Node * node ) {
-        if ( node->type( TYPE::EXPRESSION ) ) {
-
+bool try_use(
+    Node * node,
+    const map< Node *, int64_t > & evaluated,
+    int64_t & result
+) {
+    if ( node->type( TYPE::TERM ) ) {
+        if ( node->type( TYPE::NUMBER ) ) {
+            result = stol( node->content );
+            return true;
         }
-    };
-    pulse( root, on_node );
+        throw runtime_error( "ERROR: undefined term" );
+    }
+    //other expression:
+    auto ev = evaluated.find( node );
+    if ( ev == evaluated.end() )
+        return false;
+}
+
+/** Extract left and right nodes of specified operator.*/
+bool extract( Node * op, Node *& left, Node *& right ) {
+    const auto Operand = Operands.at( op->content );
+    left = nullptr;
+    right = nullptr;
+    switch ( Operand ) {
+        case OPERAND::INFIX:
+            for ( auto & ref : op->refs ) {
+                if ( ref->type( set{ TYPE::EXPRESSION, TYPE::TERM } ) )
+                    left = ref;
+                else if ( ref->type( TYPE::NONABELIAN ) )
+                    right = * ref->refs.begin();
+            }
+            if ( left == nullptr || right == nullptr ) {
+                stringstream s;
+                s << "ERROR: couldn't resolve left and right operands of operator " << op;
+                cout << s.str() << endl;
+                throw runtime_error( s.str() );
+            }
+            break;
+        
+        case OPERAND::LEFT:
+        case OPERAND::RIGHT:
+            left = find_types( op->refs, set{ TYPE::EXPRESSION, TYPE::TERM } );
+            break;
+        case OPERAND::RIGHT_ALL:
+            //TODO:
+            break;
+        default:
+            stringstream s;
+            s << "ERROR: unresolved operator's operand type " << op;
+            cout << s.str() << endl;
+            throw runtime_error( s.str() );
+            break;
+    }
+}
+
+bool try_evaluate(
+    Node * expr,
+    const map< Node *, int64_t > & evaluated,
+    int64_t & value
+) {
+    auto op = find_types( expr->refs, TYPE::OPERATOR );
+    if ( op == nullptr )
+        throw runtime_error( "ERROR: Expected operator" );
+    
+    Node * left = nullptr;
+    Node * right = nullptr;
+    extract( op, left, right );
+
+    auto left_it = evaluated.find( left );
+    if ( left != nullptr && left_it == evaluated.end() )
+        return false;
+    auto right_it = evaluated.find( right );
+    if ( right != nullptr && right_it == evaluated.end() )
+        return false;
+    
+    if ( op->content == "/" ) {
+        value = left_it->second / right_it->second;
+    }
+    else if ( op->content == "@+" ) {
+        value = left_it->second + right_it->second;
+    }
+    else if ( op->content == "=" ) {
+        //TODO:
+    }
+    else {
+        throw runtime_error( string( "ERROR: undefined yet operator: " ) + op->content );
+    }
+
+    return true;
+}
+
+void try_evaluate_all( Node * root ) {
+    //TODO: debug mode ofc, until evaluation is sufficiently abstract:
+    map< Node *, int64_t > evaluated;
+
+    //everything pulses once:
+    bool moved = true;
+    while ( moved ) {
+        moved = false;
+        const auto & on_expr = [&]( Node * expr ) {
+            if ( ! expr->type( TYPE::EXPRESSION ) )
+                return;
+
+            //if every TERM this EXPRESSION depends on can be evaluated right now:
+            bool free = true;
+            for ( auto & ref : expr->refs ) {
+                if ( ! ref->type( set{ TYPE::EXPRESSION, TYPE::TERM } ) )
+                    continue;
+                if ( evaluated.find( ref ) == evaluated.end() ) {
+                    free = false;
+                    break;
+                }
+            }
+            if ( free ) {
+                moved = true;
+                int64_t value = 0;
+                const auto was_evaluated = try_evaluate( expr, evaluated, value );
+                if ( was_evaluated ) {
+                    evaluated[ expr ] = value;
+                }
+            }
+        };
+        pulse( root, on_expr );
+    }
+}
+
+void intersect( Node * root ) {
+    map< Node *, list< set< Node * > > > state;
 }
 
 auto parse( const string & file_name )

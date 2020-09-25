@@ -1,23 +1,32 @@
 
-#include "parse.hpp"
+#include "syntactic.hpp"
+#include "semantic.hpp"
 
 /** Compiled strictly typed non-deterministic programming language based on lambda-calculus, reactive programming, homotopy type theory and fractal growth to easily handle composition.*/
 
-/** The whole execution/data (remember code-data equivalence) model takes shape of bidirectional graph (actually probably the most abstract data structure you can't even reason about).*/
-struct Graph {
-
-};
-
-/** Simplest unit with which programs are written in this programming language: doesn't have any nature (properties) or "parts": basically just named dots.
+/**
+The whole execution/data (remember code-data equivalence) model takes shape of bidirectional graph (actually probably the most abstract data structure you can't even reason about).
+Simplest unit with which programs are written in this programming language: doesn't have any nature (properties) or "parts": basically just named dots.
 Compositions of these resemble functions (functions can be built with these). Roll Safe: "Why give definition to recursive function if you can have a recursive definition of a function?". Recursion defines the topology of propagation graph on top of which entity fractals grow and thus only sinks are kept to constitute the further growth (the growth itself IS the computer program). Some of the growth might be performed on compile time, but not always (this technique is equivalent to 'dependent types').
 These entities are like reactive outputs: only resulting value on single entity (entity pluralism might be achieved with another composition though) regards the intended meaning: all the fractaled values are dropped (but only after they're lazily evaluated).
-*/
 struct Entity {};
+*/
+
+auto process( const string & source_name )
+{
+    auto root = syntactic( source_name );
+    plot( root, set{ TYPE::EXPRESSION, TYPE::TERM, TYPE::NONABELIAN }, "semantics" );
+
+    semantic( root );
+    plot( root, set{ TYPE::EXPRESSION, TYPE::TERM, TYPE::ENTITY, TYPE::NONABELIAN }, "expressions" );
+
+    cout << "Done." << endl;
+}
 
 int main() {
     //parse( "../samples/program_1.rcl" );
     //parse( "../samples/falcon.rcl" );
-    parse( "../samples/square_equation.rcl" );
+    process( "../samples/square_equation.rcl" );
     //pulse_ast_with_numbered_waves_by_composing_layered_waves_on_entities();
 
     //every composition needs to be reversible (so to define sqrt() function you'll have to define complex numbers and thus recompose (+),(-),(*), etc)

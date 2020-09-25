@@ -716,6 +716,7 @@ void print_file( const string & file_name ) {
     cout << "================================================" << endl;
 }
 
+/** All yet syntactically the same TERMs should merge into a single TERM (all EXPRESSIONs references need to repoint) and those dropped are removed.*/
 void merge_occurences( Node * root ) {
     set< Node * > remove;
     map< string, Node * > terms;
@@ -870,6 +871,7 @@ void try_evaluate_all( Node * root ) {
         };
         pulse( root, on_expr );
     }
+    //every node should be evaluated by now because we're topologically locked (knotted?) ...
 }
 
 void intersect( Node * root ) {

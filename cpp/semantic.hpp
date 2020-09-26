@@ -31,7 +31,7 @@ void merge_occurences( Node * root ) {
         delete r;
 }
 
-int64_t string_to_int( const string & content ) {
+double string_to_int( const string & content ) {
     char * tail;
     return strtoll( content.c_str(), & tail, 0 );
 }
@@ -39,18 +39,16 @@ int64_t string_to_int( const string & content ) {
 /** Obtain the result of evaluation of specified node and return true if successfully obtained.*/
 bool try_use(
     Node * node,
-    const map< Node *, int64_t > & evaluated,
-    int64_t & result
+    const map< Node *, double > & evaluated,
+    double & result
 ) {
     if ( node->type( TYPE::TERM ) ) {
         if ( node->type( TYPE::NUMBER ) ) {
             result = string_to_int( node->content );
             return true;
         }
-        //otherwise it's just a variable and we cannot evaluate it directly:
-        return false;
     }
-    //other expression:
+    //other expression or variables:
     auto ev = evaluated.find( node );
     if ( ev == evaluated.end() )
         return false;
@@ -68,16 +66,19 @@ void extract( Node * expr, Node * op, Node *& left, Node *& right ) {
         {
             for ( auto & ref : expr->refs ) {
                 if ( ref->type( set{ TYPE::EXPRESSION, TYPE::TERM } ) ) {
-                    if ( left == nullptr )
-                        left = ref;
-                    else
+                    if ( right == nullptr )
                         right = ref;
+                    else
+                        left = ref;
                 }
             }
 
             auto nonabelian = find_types( expr->refs, TYPE::NONABELIAN );
-            if ( nonabelian != nullptr )
-                right = * nonabelian->refs.begin();
+            if ( nonabelian != nullptr ) {
+                auto na = * nonabelian->refs.begin();
+                if ( na == right )
+                    swap( left, right );
+            }
             
             if ( left == nullptr || right == nullptr ) {
                 stringstream s;
@@ -86,6 +87,12 @@ void extract( Node * expr, Node * op, Node *& left, Node *& right ) {
                 cout << "    it's refs:" << endl;
                 for ( auto & ref : expr->refs )
                     cout << "        " << ref << endl;
+                throw runtime_error( s.str() );
+            }
+            if ( left == right ) {
+                stringstream s;
+                s << "ERROR: left and right operands of " << expr << " are the same; something is wrong";
+                cout << s.str() << endl;
                 throw runtime_error( s.str() );
             }
             break;
@@ -149,14 +156,14 @@ void check_bidirectional_op(
 */
 bool try_evaluate(
     Node * expr,
-    const map< Node *, int64_t > & evaluated,
-    int64_t & value,
+    const map< Node *, double > & values,
+    double & value,
     Node *& destination
 ) {
     destination = expr;
 
     //if already evaluated or can be (i.e. it's just number) evaluated as it is:
-    if ( try_use( expr, evaluated, value ) )
+    if ( try_use( expr, values, value ) )
         return true;
     
     //if it's TERM and still wasn't used, then it's yet undefined variable:
@@ -171,14 +178,20 @@ bool try_evaluate(
     Node * right = nullptr;
     extract( expr, op, left, right );
 
-    int64_t left_v;
-    bool can_left = left != nullptr && try_use( left, evaluated, left_v );
+    double left_v;
+    bool can_left = left != nullptr && try_use( left, values, left_v );
 
-    int64_t right_v;
-    bool can_right = right != nullptr && try_use( right, evaluated, right_v );
+    double right_v;
+    bool can_right = right != nullptr && try_use( right, values, right_v );
 
-    if ( ! can_left && ! can_right )
+    if ( ! can_left && ! can_right ) {
+        cout << "        cannot evaluate " << expr << " because none of it's both references are evaluated. It's references:" << endl;
+        for ( const auto & ref : expr->refs )
+            cout << "            " << ref << endl;
+        cout << "        left: " << left << endl;
+        cout << "        right: " << right << endl;
         return false;
+    }
 
     //some OPERATORs require only one side to be evaluated:
     if ( op->content == "="  ) {
@@ -212,10 +225,14 @@ bool try_evaluate(
         return false;
     }
 
-    if ( left != nullptr && ! can_left )
+    if ( left != nullptr && ! can_left ) {
+        cout << "        left operand of " << expr << " is specified but cannot be evaluated yet." << endl;
         return false;
-    if ( right != nullptr && ! can_right )
+    }
+    if ( right != nullptr && ! can_right ) {
+        cout << "        right operand of " << expr << " is specified but cannot be evaluated yet." << endl;
         return false;
+    }
     
     //it's free to be evaluated:
     value = apply_operator( op, left_v, right_v );
@@ -224,7 +241,9 @@ bool try_evaluate(
 
 void try_evaluate_all( Node * root ) {
     //TODO: debug mode ofc, until evaluation is sufficiently abstract:
-    map< Node *, int64_t > evaluated;
+    //some EXPRESSIONs require just the flag that it was evaluated, but some require the value:
+    set< Node * > evaluated;
+    map< Node *, double > values;
 
     //everything pulses once:
     bool moved = true;
@@ -239,19 +258,41 @@ void try_evaluate_all( Node * root ) {
             if ( evaluated.find( expr ) != evaluated.end() )
                 return;
             
-            int64_t value = 0;
+            cout << "    trying to evaluate " << expr << endl;
+            
+            double value = 0;
             Node * destination;
-            const auto was_evaluated = try_evaluate( expr, evaluated, value, destination );
-            if ( was_evaluated ) {
-                cout << "    expression " << expr << " got evaluated." << endl;
-                moved = true;
-                evaluated[ destination ] = value;
-            }
+            if ( ! try_evaluate( expr, values, value, destination ) )
+                return;
+            cout << "    expression " << expr << " got evaluated." << endl;
+            moved = true;
+            values[ destination ] = value;
+            evaluated.insert( destination );
+            if ( expr != destination )
+                evaluated.insert( expr );
         };
         pulse( root, on_expr );
     }
+
     //every node should be evaluated by now because we're topologically locked (knotted?) ...
-    cout << "Topo evaluation has stopped due to lock or exhaustion. Nodes evaluated: " << evaluated.size() << endl;
+    cout << "Topo evaluation has stopped due to lock or exhaustion. Nodes evaluated: " << evaluated.size() << ":" << endl;
+    cout << "    facts:" << endl;
+    for ( const auto & e : evaluated )
+        cout << "        " << e << endl;
+    cout << "    values:" << endl;
+    for ( const auto & v : values )
+        cout << "        " << v.first << " : " << v.second << endl;
+    
+    set< Node * > needs_evaluation;
+    const auto & on_ev = [&]( Node * ev ) {
+        if ( ev->type( set{ TYPE::EXPRESSION, TYPE::TERM } ) && evaluated.find( ev ) == evaluated.end() )
+            needs_evaluation.insert( ev );
+    };
+    pulse( root, on_ev );
+    cout << "    " << needs_evaluation.size() << " need to be evaluated:" << endl;
+    for ( const auto & e : needs_evaluation ) {
+        cout << "        " << e << endl;
+    }
 }
 
 void intersect( Node * root ) {

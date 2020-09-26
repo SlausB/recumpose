@@ -17,8 +17,8 @@ auto process( const string & source_name )
     auto root = syntactic( source_name );
     plot( root, set{ TYPE::EXPRESSION, TYPE::TERM, TYPE::NONABELIAN }, "semantics" );
 
-    semantic( root );
     plot( root, set{ TYPE::EXPRESSION, TYPE::TERM, TYPE::ENTITY, TYPE::NONABELIAN }, "expressions" );
+    semantic( root );
 
     cout << "Done." << endl;
 }

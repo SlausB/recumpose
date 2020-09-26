@@ -240,9 +240,9 @@ void match_operators( Node * root ) {
 }
 
 bool is_number( const string & content ) {
-    char * tail;
+    char * tail = (char*)1;
     strtoll( content.c_str(), & tail, 0 );
-    return errno == 0;
+    return tail == ( & ( content [ content.size() ] ) );
 }
 
 void match_terms( Node * root ) {

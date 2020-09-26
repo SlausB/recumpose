@@ -57,37 +57,49 @@ bool try_use(
     return true;
 }
 
-/** Extract left and right nodes of specified operator.*/
-void extract( Node * op, Node *& left, Node *& right ) {
+/** Extract left and right nodes of specified EXPRESSION.*/
+void extract( Node * expr, Node * op, Node *& left, Node *& right ) {
     const auto Operand = Operands.at( op->content );
     left = nullptr;
     right = nullptr;
     switch ( Operand ) {
         case OPERAND::INFIX:
-            for ( auto & ref : op->refs ) {
-                if ( ref->type( set{ TYPE::EXPRESSION, TYPE::TERM } ) )
-                    left = ref;
-                else if ( ref->type( TYPE::NONABELIAN ) )
-                    right = * ref->refs.begin();
+        {
+            for ( auto & ref : expr->refs ) {
+                if ( ref->type( set{ TYPE::EXPRESSION, TYPE::TERM } ) ) {
+                    if ( left == nullptr )
+                        left = ref;
+                    else
+                        right = ref;
+                }
             }
+
+            auto nonabelian = find_types( expr->refs, TYPE::NONABELIAN );
+            if ( nonabelian != nullptr )
+                right = * nonabelian->refs.begin();
+            
             if ( left == nullptr || right == nullptr ) {
                 stringstream s;
-                s << "ERROR: couldn't resolve left and right operands of operator " << op;
+                s << "ERROR: couldn't resolve left and right operands of " << expr;
                 cout << s.str() << endl;
+                cout << "    it's refs:" << endl;
+                for ( auto & ref : expr->refs )
+                    cout << "        " << ref << endl;
                 throw runtime_error( s.str() );
             }
             break;
+        }
         
         case OPERAND::LEFT:
         case OPERAND::RIGHT:
-            left = find_types( op->refs, set{ TYPE::EXPRESSION, TYPE::TERM } );
+            left = find_types( expr->refs, set{ TYPE::EXPRESSION, TYPE::TERM } );
             break;
         case OPERAND::RIGHT_ALL:
             //TODO:
             break;
         default:
             stringstream s;
-            s << "ERROR: unresolved operator's operand type " << op;
+            s << "ERROR: unresolved operand type of operator " << op;
             cout << s.str() << endl;
             throw runtime_error( s.str() );
     }
@@ -131,6 +143,10 @@ bool try_evaluate(
 ) {
     if ( try_use( expr, evaluated, value ) )
         return true;
+    
+    //if it's TERM and still wasn't used, then it's yet undefined variable:
+    if ( expr->type( TYPE::TERM ) )
+        return false;
 
     auto op = find_types( expr->refs, TYPE::OPERATOR );
     if ( op == nullptr )
@@ -138,7 +154,7 @@ bool try_evaluate(
     
     Node * left = nullptr;
     Node * right = nullptr;
-    extract( op, left, right );
+    extract( expr, op, left, right );
 
     int64_t left_v;
     if ( left != nullptr ) {
@@ -163,9 +179,14 @@ void try_evaluate_all( Node * root ) {
     //everything pulses once:
     bool moved = true;
     while ( moved ) {
+        cout << "Trying to evaluate any of expressions ..." << endl;
         moved = false;
         const auto & on_expr = [&]( Node * expr ) {
             if ( ! expr->type( set{ TYPE::EXPRESSION, TYPE::TERM } ) )
+                return;
+            
+            //if was already evaluated within current propagation:
+            if ( evaluated.find( expr ) != evaluated.end() )
                 return;
 
             //if every TERM this EXPRESSION depends on can be evaluated right now:
@@ -173,6 +194,7 @@ void try_evaluate_all( Node * root ) {
                 int64_t value = 0;
                 const auto was_evaluated = try_evaluate( expr, evaluated, value );
                 if ( was_evaluated ) {
+                    cout << "    expression " << expr << " got evaluated." << endl;
                     moved = true;
                     evaluated[ expr ] = value;
                 }
@@ -189,6 +211,7 @@ void intersect( Node * root ) {
 }
 
 auto semantic( Node * root ) {
+    cout << "SEMANTIC:" << endl;
     merge_occurences( root );
     try_evaluate_all( root );
 }

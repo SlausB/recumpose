@@ -36,6 +36,7 @@ int64_t string_to_int( const string & content ) {
     return strtoll( content.c_str(), & tail, 0 );
 }
 
+/** Obtain the result of evaluation of specified node and return true if successfully obtained.*/
 bool try_use(
     Node * node,
     const map< Node *, int64_t > & evaluated,
@@ -107,40 +108,67 @@ void extract( Node * expr, Node * op, Node *& left, Node *& right ) {
 
 auto apply_operator( Node * op, const auto & left, const auto & right )
 {
-    if      ( op->content == "/"  ) {
+    if ( op->content == "/"  )
         return left / right;
-    }
-    else if ( op->content == "+"  ) {
+    if ( op->content == "+"  )
         return left / right;
-    }
-    else if ( op->content == "-"  ) {
+    if ( op->content == "-"  )
         return left - right;
-    }
-    else if ( op->content == "*"  ) {
+    if ( op->content == "*"  )
         return left * right;
-    }
-    else if ( op->content == "@+" ) {
+    if ( op->content == "@+" )
         return left + right;
-    }
     
     throw runtime_error( string( "ERROR: undefined yet operator: " ) + op->content );
 }
 
+/** Returns true if every TERM specified EXPRESSION depends on can be evaluated right now because present within evaluated.*/
 bool is_free_to_evaluate( Node * expr, const auto & evaluated ) {
     for ( auto & ref : expr->refs ) {
         if ( ! ref->type( set{ TYPE::EXPRESSION, TYPE::TERM } ) )
             continue;
-        if ( evaluated.find( ref ) == evaluated.end() )
+        if ( evaluated.find( ref ) == evaluated.end() ) {
+            cout << "    cannot evaluate " << expr << " because it's ref " << ref << " is NOT yet evaluated." << endl;
             return false;
+        }
     }
     return true;
 }
 
+void check_bidirectional_op(
+    const Node * op,
+    const bool can_left,
+    const bool can_right,
+    const Node * left,
+    const Node * right
+) {
+    if ( can_left && can_right ) {
+        stringstream s;
+        s << "ERROR: both left and right operands of " << op << " are already evaluated: shouldn't evaluate it on top; something is wrong.";
+        cout << s.str() << endl;
+        throw new runtime_error( s.str() );
+    }
+
+    if ( left == nullptr && right == nullptr ) {
+        stringstream s;
+        s << "ERROR: bidirectional operator " << op << " requires both left and right operands.";
+        cout << s.str() << endl;
+        throw new runtime_error( s.str() );
+    }
+}
+
+/**
+@param destination where the result of evaluation should go. Is set to any non-null value only if goes into one of OPERATOR's TERMs (like "=", "<-" ...).
+*/
 bool try_evaluate(
     Node * expr,
     const map< Node *, int64_t > & evaluated,
-    int64_t & value
+    int64_t & value,
+    Node *& destination
 ) {
+    destination = expr;
+
+    //if already evaluated or can be (i.e. it's just number) evaluated as it is:
     if ( try_use( expr, evaluated, value ) )
         return true;
     
@@ -157,18 +185,50 @@ bool try_evaluate(
     extract( expr, op, left, right );
 
     int64_t left_v;
-    if ( left != nullptr ) {
-        if ( ! try_use( left, evaluated, left_v ) )
-            return false;
-    }
-    int64_t right_v;
-    if ( right != nullptr ) {
-        if ( ! try_use( right, evaluated, right_v ) )
-            return false;
-    }
-    
-    apply_operator( op, left_v, right_v );
+    bool can_left = left != nullptr && try_use( left, evaluated, left_v );
 
+    int64_t right_v;
+    bool can_right = right != nullptr && try_use( right, evaluated, right_v );
+
+    if ( ! can_left && ! can_right )
+        return false;
+
+    //some OPERATORs require only one side to be evaluated:
+    if ( op->content == "="  ) {
+        check_bidirectional_op( op, can_left, can_right, left, right );
+        if ( can_left ) {
+            value = left_v;
+            destination = right;
+        }
+        else {
+            value = right_v;
+            destination = left;
+        }
+    }
+    if ( op->content == "<-" ) {
+        check_bidirectional_op( op, can_left, can_right, left, right );
+        if ( can_right ) {
+            value = right_v;
+            destination = left;
+        }
+        return false;
+    }
+    if ( op->content == "->" ) {
+        check_bidirectional_op( op, can_left, can_right, left, right );
+        if ( can_left ) {
+            value = left_v;
+            destination = right;
+        }
+        return false;
+    }
+
+    if ( left != nullptr && ! can_left )
+        return false;
+    if ( right != nullptr && ! can_right )
+        return false;
+    
+    //it's free to be evaluated:
+    value = apply_operator( op, left_v, right_v );
     return true;
 }
 
@@ -189,15 +249,16 @@ void try_evaluate_all( Node * root ) {
             if ( evaluated.find( expr ) != evaluated.end() )
                 return;
 
-            //if every TERM this EXPRESSION depends on can be evaluated right now:
-            if ( is_free_to_evaluate( expr, evaluated ) ) {
-                int64_t value = 0;
-                const auto was_evaluated = try_evaluate( expr, evaluated, value );
-                if ( was_evaluated ) {
-                    cout << "    expression " << expr << " got evaluated." << endl;
-                    moved = true;
-                    evaluated[ expr ] = value;
-                }
+            if ( ! is_free_to_evaluate( expr, evaluated ) )
+                return;
+            
+            int64_t value = 0;
+            Node * destination;
+            const auto was_evaluated = try_evaluate( expr, evaluated, value, destination );
+            if ( was_evaluated ) {
+                cout << "    expression " << expr << " got evaluated." << endl;
+                moved = true;
+                evaluated[ destination ] = value;
             }
         };
         pulse( root, on_expr );

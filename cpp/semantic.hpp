@@ -122,19 +122,6 @@ auto apply_operator( Node * op, const auto & left, const auto & right )
     throw runtime_error( string( "ERROR: undefined yet operator: " ) + op->content );
 }
 
-/** Returns true if every TERM specified EXPRESSION depends on can be evaluated right now because present within evaluated.*/
-bool is_free_to_evaluate( Node * expr, const auto & evaluated ) {
-    for ( auto & ref : expr->refs ) {
-        if ( ! ref->type( set{ TYPE::EXPRESSION, TYPE::TERM } ) )
-            continue;
-        if ( evaluated.find( ref ) == evaluated.end() ) {
-            cout << "    cannot evaluate " << expr << " because it's ref " << ref << " is NOT yet evaluated." << endl;
-            return false;
-        }
-    }
-    return true;
-}
-
 void check_bidirectional_op(
     const Node * op,
     const bool can_left,
@@ -204,12 +191,14 @@ bool try_evaluate(
             value = right_v;
             destination = left;
         }
+        return true;
     }
     if ( op->content == "<-" ) {
         check_bidirectional_op( op, can_left, can_right, left, right );
         if ( can_right ) {
             value = right_v;
             destination = left;
+            return true;
         }
         return false;
     }
@@ -218,6 +207,7 @@ bool try_evaluate(
         if ( can_left ) {
             value = left_v;
             destination = right;
+            return true;
         }
         return false;
     }
@@ -247,9 +237,6 @@ void try_evaluate_all( Node * root ) {
             
             //if was already evaluated within current propagation:
             if ( evaluated.find( expr ) != evaluated.end() )
-                return;
-
-            if ( ! is_free_to_evaluate( expr, evaluated ) )
                 return;
             
             int64_t value = 0;

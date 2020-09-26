@@ -2,7 +2,7 @@
 #define CATCH_CONFIG_MAIN
 
 #include "../lib/Catch2/single_include/catch2/catch.hpp"
-#include "../cpp/parse.hpp"
+#include "../cpp/syntactic.hpp"
 
 using namespace Catch;
 

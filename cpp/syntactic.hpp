@@ -15,6 +15,7 @@
 #include <numeric>
 #include "syntax_tree.hpp"
 #include "plot.hpp"
+#include <stdlib.h>
 
 using namespace std;
 
@@ -238,6 +239,12 @@ void match_operators( Node * root ) {
     pulse( root, on_line );
 }
 
+bool is_number( const string & content ) {
+    char * tail;
+    strtoll( content.c_str(), & tail, 0 );
+    return errno == 0;
+}
+
 void match_terms( Node * root ) {
     const auto & on_line = [&]( Node * line_node ) {
         if ( ! line_node->type( TYPE::LINE ) )
@@ -262,6 +269,9 @@ void match_terms( Node * root ) {
                     );
                     line_node->ref( term_node );
                     cout << "Term " << term_node->content << " spawned at " << term_node->source_pos << " with length " << length << endl;
+
+                    if ( is_number( term_node->content ) )
+                        term_node->types.insert( TYPE::NUMBER );
                 }
                 seq_start = caret + 1;
             }
@@ -633,7 +643,7 @@ void match_right_all( Node * file ) {
             return;
         //if NOT top level expression:
         if ( find_types( node->refd, vector{ TYPE::EXPRESSION, TYPE::ENTITY } ) != nullptr ) {
-            cout << "    skipping node " << node << " because it's NOT top-level since it's referenced by " << find_types( node->refd, vector{ TYPE::EXPRESSION, TYPE::ENTITY } ) << endl;
+            //cout << "    skipping node " << node << " because it's NOT top-level since it's referenced by " << find_types( node->refd, vector{ TYPE::EXPRESSION, TYPE::ENTITY } ) << endl;
             return;
         }
         top_level_set.insert( node );

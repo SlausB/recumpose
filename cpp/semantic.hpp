@@ -31,6 +31,11 @@ void merge_occurences( Node * root ) {
         delete r;
 }
 
+int64_t string_to_int( const string & content ) {
+    char * tail;
+    return strtoll( content.c_str(), & tail, 0 );
+}
+
 bool try_use(
     Node * node,
     const map< Node *, int64_t > & evaluated,
@@ -38,19 +43,22 @@ bool try_use(
 ) {
     if ( node->type( TYPE::TERM ) ) {
         if ( node->type( TYPE::NUMBER ) ) {
-            result = stol( node->content );
+            result = string_to_int( node->content );
             return true;
         }
-        throw runtime_error( "ERROR: undefined term" );
+        //otherwise it's just a variable and we cannot evaluate it directly:
+        return false;
     }
     //other expression:
     auto ev = evaluated.find( node );
     if ( ev == evaluated.end() )
         return false;
+    result = ev->second;
+    return true;
 }
 
 /** Extract left and right nodes of specified operator.*/
-bool extract( Node * op, Node *& left, Node *& right ) {
+void extract( Node * op, Node *& left, Node *& right ) {
     const auto Operand = Operands.at( op->content );
     left = nullptr;
     right = nullptr;
@@ -82,8 +90,38 @@ bool extract( Node * op, Node *& left, Node *& right ) {
             s << "ERROR: unresolved operator's operand type " << op;
             cout << s.str() << endl;
             throw runtime_error( s.str() );
-            break;
     }
+}
+
+auto apply_operator( Node * op, const auto & left, const auto & right )
+{
+    if      ( op->content == "/"  ) {
+        return left / right;
+    }
+    else if ( op->content == "+"  ) {
+        return left / right;
+    }
+    else if ( op->content == "-"  ) {
+        return left - right;
+    }
+    else if ( op->content == "*"  ) {
+        return left * right;
+    }
+    else if ( op->content == "@+" ) {
+        return left + right;
+    }
+    
+    throw runtime_error( string( "ERROR: undefined yet operator: " ) + op->content );
+}
+
+bool is_free_to_evaluate( Node * expr, const auto & evaluated ) {
+    for ( auto & ref : expr->refs ) {
+        if ( ! ref->type( set{ TYPE::EXPRESSION, TYPE::TERM } ) )
+            continue;
+        if ( evaluated.find( ref ) == evaluated.end() )
+            return false;
+    }
+    return true;
 }
 
 bool try_evaluate(
@@ -91,6 +129,9 @@ bool try_evaluate(
     const map< Node *, int64_t > & evaluated,
     int64_t & value
 ) {
+    if ( try_use( expr, evaluated, value ) )
+        return true;
+
     auto op = find_types( expr->refs, TYPE::OPERATOR );
     if ( op == nullptr )
         throw runtime_error( "ERROR: Expected operator" );
@@ -99,31 +140,18 @@ bool try_evaluate(
     Node * right = nullptr;
     extract( op, left, right );
 
-    auto left_it = evaluated.find( left );
-    if ( left != nullptr && left_it == evaluated.end() )
-        return false;
-    auto right_it = evaluated.find( right );
-    if ( right != nullptr && right_it == evaluated.end() )
-        return false;
+    int64_t left_v;
+    if ( left != nullptr ) {
+        if ( ! try_use( left, evaluated, left_v ) )
+            return false;
+    }
+    int64_t right_v;
+    if ( right != nullptr ) {
+        if ( ! try_use( right, evaluated, right_v ) )
+            return false;
+    }
     
-    if      ( op->content == "/"  ) {
-        value = left_it->second / right_it->second;
-    }
-    else if ( op->content == "+"  ) {
-        value = left_it->second / right_it->second;
-    }
-    else if ( op->content == "-"  ) {
-        value = left_it->second - right_it->second;
-    }
-    else if ( op->content == "*"  ) {
-        value = left_it->second * right_it->second;
-    }
-    else if ( op->content == "@+" ) {
-        value = left_it->second + right_it->second;
-    }
-    else {
-        throw runtime_error( string( "ERROR: undefined yet operator: " ) + op->content );
-    }
+    apply_operator( op, left_v, right_v );
 
     return true;
 }
@@ -137,24 +165,15 @@ void try_evaluate_all( Node * root ) {
     while ( moved ) {
         moved = false;
         const auto & on_expr = [&]( Node * expr ) {
-            if ( ! expr->type( TYPE::EXPRESSION ) )
+            if ( ! expr->type( set{ TYPE::EXPRESSION, TYPE::TERM } ) )
                 return;
 
             //if every TERM this EXPRESSION depends on can be evaluated right now:
-            bool free = true;
-            for ( auto & ref : expr->refs ) {
-                if ( ! ref->type( set{ TYPE::EXPRESSION, TYPE::TERM } ) )
-                    continue;
-                if ( evaluated.find( ref ) == evaluated.end() ) {
-                    free = false;
-                    break;
-                }
-            }
-            if ( free ) {
-                moved = true;
+            if ( is_free_to_evaluate( expr, evaluated ) ) {
                 int64_t value = 0;
                 const auto was_evaluated = try_evaluate( expr, evaluated, value );
                 if ( was_evaluated ) {
+                    moved = true;
                     evaluated[ expr ] = value;
                 }
             }
@@ -162,6 +181,7 @@ void try_evaluate_all( Node * root ) {
         pulse( root, on_expr );
     }
     //every node should be evaluated by now because we're topologically locked (knotted?) ...
+    cout << "Topo evaluation has stopped due to lock or exhaustion. Nodes evaluated: " << evaluated.size() << endl;
 }
 
 void intersect( Node * root ) {
@@ -170,4 +190,5 @@ void intersect( Node * root ) {
 
 auto semantic( Node * root ) {
     merge_occurences( root );
+    try_evaluate_all( root );
 }

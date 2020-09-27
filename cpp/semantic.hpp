@@ -1,4 +1,5 @@
 #include "syntax_tree.hpp"
+#include "print.hpp"
 
 /** All yet syntactically the same TERMs should merge into a single TERM (all EXPRESSIONs references need to repoint) and those dropped are removed.*/
 void merge_occurences( Node * root ) {
@@ -129,7 +130,7 @@ auto apply_operator( Node * op, const auto & left, const auto & right )
     throw runtime_error( string( "ERROR: undefined yet operator: " ) + op->content );
 }
 
-void check_bidirectional_op(
+void assert_bidirectional_op(
     const Node * op,
     const bool can_left,
     const bool can_right,
@@ -195,7 +196,11 @@ bool try_evaluate(
 
     //some OPERATORs require only one side to be evaluated:
     if ( op->content == "="  ) {
-        check_bidirectional_op( op, can_left, can_right, left, right );
+        //it happens when operator gets applied again due to composition:
+        if ( can_left && can_right )
+            return true;
+
+        assert_bidirectional_op( op, can_left, can_right, left, right );
         if ( can_left ) {
             value = left_v;
             destination = right;
@@ -207,7 +212,7 @@ bool try_evaluate(
         return true;
     }
     if ( op->content == "<-" ) {
-        check_bidirectional_op( op, can_left, can_right, left, right );
+        assert_bidirectional_op( op, can_left, can_right, left, right );
         if ( can_right ) {
             value = right_v;
             destination = left;
@@ -216,7 +221,7 @@ bool try_evaluate(
         return false;
     }
     if ( op->content == "->" ) {
-        check_bidirectional_op( op, can_left, can_right, left, right );
+        assert_bidirectional_op( op, can_left, can_right, left, right );
         if ( can_left ) {
             value = left_v;
             destination = right;
@@ -239,12 +244,16 @@ bool try_evaluate(
     return true;
 }
 
-void try_evaluate_all( Node * root ) {
-    //TODO: debug mode ofc, until evaluation is sufficiently abstract:
-    //some EXPRESSIONs require just the flag that it was evaluated, but some require the value:
+/** Single attempt of evaluating all the TERMs and EXPRESSIONs.*/
+struct Layer {
+    /** some EXPRESSIONs require just the flag that it was evaluated, but some require the value.*/
     set< Node * > evaluated;
+    //TODO: debug mode ofc, until evaluation is sufficiently abstract:
     map< Node *, double > values;
+};
 
+void try_evaluate_all( Node * root, Layer & layer )
+{
     //everything pulses once:
     bool moved = true;
     while ( moved ) {
@@ -255,52 +264,76 @@ void try_evaluate_all( Node * root ) {
                 return;
             
             //if was already evaluated within current propagation:
-            if ( evaluated.find( expr ) != evaluated.end() )
+            if ( layer.evaluated.find( expr ) != layer.evaluated.end() )
                 return;
             
             cout << "    trying to evaluate " << expr << endl;
             
             double value = 0;
             Node * destination;
-            if ( ! try_evaluate( expr, values, value, destination ) )
+            if ( ! try_evaluate( expr, layer.values, value, destination ) )
                 return;
             cout << "    expression " << expr << " got evaluated." << endl;
             moved = true;
-            values[ destination ] = value;
-            evaluated.insert( destination );
+            layer.values[ destination ] = value;
+            layer.evaluated.insert( destination );
             if ( expr != destination )
-                evaluated.insert( expr );
+                layer.evaluated.insert( expr );
         };
         pulse( root, on_expr );
     }
 
     //every node should be evaluated by now because we're topologically locked (knotted?) ...
-    cout << "Topo evaluation has stopped due to lock or exhaustion. Nodes evaluated: " << evaluated.size() << ":" << endl;
-    cout << "    facts:" << endl;
-    for ( const auto & e : evaluated )
-        cout << "        " << e << endl;
-    cout << "    values:" << endl;
-    for ( const auto & v : values )
-        cout << "        " << v.first << " : " << v.second << endl;
-    
-    set< Node * > needs_evaluation;
-    const auto & on_ev = [&]( Node * ev ) {
-        if ( ev->type( set{ TYPE::EXPRESSION, TYPE::TERM } ) && evaluated.find( ev ) == evaluated.end() )
-            needs_evaluation.insert( ev );
-    };
-    pulse( root, on_ev );
-    cout << "    " << needs_evaluation.size() << " need to be evaluated:" << endl;
-    for ( const auto & e : needs_evaluation ) {
-        cout << "        " << e << endl;
-    }
+    print_evaluation( layer, root );
 }
 
 void intersect( Node * root ) {
     map< Node *, list< set< Node * > > > state;
 }
 
+void apply_compositions( Node * root, Layer & previous, Layer & into ) {
+    const auto & on_op = [&]( Node * op ) {
+        if ( ! op->type( TYPE::OPERATOR ) )
+            return;
+        
+        auto expr = find_types( op->refd, TYPE::EXPRESSION );
+        if ( expr == nullptr )
+            throw new runtime_error( "ERROR: operator must be referenced by an EXPRESSION" );
+
+        Node * left = nullptr;
+        Node * right = nullptr;
+        extract( expr, op, left, right );
+        
+        if ( op->content == "@+" ) {
+            into.evaluated.insert( left );
+            if ( previous.evaluated.find( left ) == previous.evaluated.end() )
+                throw new runtime_error( "ERROR: left operand of operator @+ should be evaluated within previous propagation" );
+            if ( previous.evaluated.find( right ) == previous.evaluated.end() )
+                throw new runtime_error( "ERROR: right operand of operator @+ should be evaluated within previous propagation" );
+            into.values[ left ] = previous.values[ left ] + previous.values[ right ];
+        }
+        //TODO: other operators as well including bidirectional "=" operator ...
+    };
+    pulse( root, on_op );
+}
+
 auto semantic( Node * root ) {
     cout << "SEMANTIC:" << endl;
     merge_occurences( root );
-    try_evaluate_all( root );
+
+    Layer layer;
+    try_evaluate_all( root, layer );
+
+    Layer next;
+    apply_compositions( root, layer, next );
+
+    //after applying compositions here we might be able to obtain proofs about growing only into certain directions, thus providing (synthesizing) program which will just implement such growth (such program can also be expressed in such different way: it's a detangle of programmer-specified entanglement of problem space into 1-dimensional array of computer's memory+operations solution space) ...
+
+    //... but for now we don't know yet how to do it (it shouldn't be impossible though, and actually we don't need to solve any configuration, just some), so just execute some:
+    for ( int i = 0; i < 20; ++ i ) {
+        try_evaluate_all( root, next );
+        Layer future;
+        apply_compositions( root, next, future );
+        next = future;
+    }
 }

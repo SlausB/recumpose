@@ -310,7 +310,9 @@ void apply_compositions( Node * root, Layer & previous, Layer & into ) {
                 throw new runtime_error( "ERROR: left operand of operator @+ should be evaluated within previous propagation" );
             if ( previous.evaluated.find( right ) == previous.evaluated.end() )
                 throw new runtime_error( "ERROR: right operand of operator @+ should be evaluated within previous propagation" );
+            cout << "Composing " << left << " + " << right << " into " << left << " :" << endl;
             into.values[ left ] = previous.values[ left ] + previous.values[ right ];
+            cout << "    " << previous.values[ left ] << " + " << previous.values[ right ] << " = " << into.values[ left ] << endl;
         }
         //TODO: other operators as well including bidirectional "=" operator ...
     };
@@ -330,7 +332,7 @@ auto semantic( Node * root ) {
     //after applying compositions here we might be able to obtain proofs about growing only into certain directions, thus providing (synthesizing) program which will just implement such growth (such program can also be expressed in such different way: it's a detangle of programmer-specified entanglement of problem space into 1-dimensional array of computer's memory+operations solution space) ...
 
     //... but for now we don't know yet how to do it (it shouldn't be impossible though, and actually we don't need to solve any configuration, just some), so just execute some:
-    for ( int i = 0; i < 20; ++ i ) {
+    for ( int i = 0; i < 5; ++ i ) {
         try_evaluate_all( root, next );
         Layer future;
         apply_compositions( root, next, future );

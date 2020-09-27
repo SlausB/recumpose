@@ -291,6 +291,7 @@ void intersect( Node * root ) {
     map< Node *, list< set< Node * > > > state;
 }
 
+/** Doesn't make sense yet. Fill figure out what Composition in this language means some time later.*/
 void apply_compositions( Node * root, Layer & previous, Layer & into ) {
     const auto & on_op = [&]( Node * op ) {
         if ( ! op->type( TYPE::OPERATOR ) )
@@ -319,6 +320,55 @@ void apply_compositions( Node * root, Layer & previous, Layer & into ) {
     pulse( root, on_op );
 }
 
+struct Branch {
+    string name;
+    /** Requires to know the results of execution of these other Branches: */
+    set< Branch * > refs;
+    /** Results of execution of this Branch referenced by: */
+    set< Branch * > refd;
+
+    void ref( Branch * other ) {
+        this->refs.insert( other );
+        other->refd.insert( this );
+    }
+};
+
+auto branch_compositions( Node * root, Layer & previous /*, array of Layers here? */ ) {
+    vector< Branch * > branches;
+
+    const auto & on_op = [&]( Node * op ) {
+        if ( ! op->type( TYPE::OPERATOR ) )
+            return;
+        
+        auto expr = find_types( op->refd, TYPE::EXPRESSION );
+        if ( expr == nullptr )
+            throw new runtime_error( "ERROR: operator must be referenced by an EXPRESSION" );
+
+        Node * left = nullptr;
+        Node * right = nullptr;
+        extract( expr, op, left, right );
+
+        if ( op->content == "@+" ) {
+            //spawns 2 branches:
+
+            auto left_branch = new Branch;
+            branches.push_back( left_branch );
+            left_branch->name = left->content + " = " + to_string( previous.values[ left ] ) + " and consumes right with +:";
+
+            auto right_branch = new Branch;
+            branches.push_back( right_branch );
+            stringstream s;
+            s << "= " << previous.values[ right ] << " and requires further execution as " << right;
+            right_branch->name = s.str();
+
+            left_branch->ref( right_branch );
+        }
+    };
+    pulse( root, on_op );
+
+    return branches;
+}
+
 auto semantic( Node * root ) {
     cout << "SEMANTIC:" << endl;
     merge_occurences( root );
@@ -326,7 +376,7 @@ auto semantic( Node * root ) {
     Layer layer;
     try_evaluate_all( root, layer );
 
-    Layer next;
+    /*Layer next;
     apply_compositions( root, layer, next );
 
     //after applying compositions here we might be able to obtain proofs about growing only into certain directions, thus providing (synthesizing) program which will just implement such growth (such program can also be expressed in such different way: it's a detangle of programmer-specified entanglement of problem space into 1-dimensional array of computer's memory+operations solution space) ...
@@ -337,5 +387,10 @@ auto semantic( Node * root ) {
         Layer future;
         apply_compositions( root, next, future );
         next = future;
-    }
+    }*/
+
+    auto branches = branch_compositions( root, layer );
+    cout << "Should spawn " << branches.size() << " branches:" << endl;
+    for ( const auto & branch : branches )
+        cout << "    branch " << branch->name << endl;
 }

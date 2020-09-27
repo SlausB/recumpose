@@ -1,3 +1,9 @@
 
 x = 5
+
 x @+ x / 2
+
+/** also, maybe could be stated this way?:
+x = x + x / 2
+but it mostly resembles the non-composable expression :(
+*/

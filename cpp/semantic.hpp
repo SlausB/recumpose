@@ -287,39 +287,6 @@ void try_evaluate_all( Node * root, Layer & layer )
     print_evaluation( layer, root );
 }
 
-void intersect( Node * root ) {
-    map< Node *, list< set< Node * > > > state;
-}
-
-/** Doesn't make sense yet. Fill figure out what Composition in this language means some time later.*/
-void apply_compositions( Node * root, Layer & previous, Layer & into ) {
-    const auto & on_op = [&]( Node * op ) {
-        if ( ! op->type( TYPE::OPERATOR ) )
-            return;
-        
-        auto expr = find_types( op->refd, TYPE::EXPRESSION );
-        if ( expr == nullptr )
-            throw new runtime_error( "ERROR: operator must be referenced by an EXPRESSION" );
-
-        Node * left = nullptr;
-        Node * right = nullptr;
-        extract( expr, op, left, right );
-        
-        if ( op->content == "@+" ) {
-            into.evaluated.insert( left );
-            if ( previous.evaluated.find( left ) == previous.evaluated.end() )
-                throw new runtime_error( "ERROR: left operand of operator @+ should be evaluated within previous propagation" );
-            if ( previous.evaluated.find( right ) == previous.evaluated.end() )
-                throw new runtime_error( "ERROR: right operand of operator @+ should be evaluated within previous propagation" );
-            cout << "Composing " << left << " + " << right << " into " << left << " :" << endl;
-            into.values[ left ] = previous.values[ left ] + previous.values[ right ];
-            cout << "    " << previous.values[ left ] << " + " << previous.values[ right ] << " = " << into.values[ left ] << endl;
-        }
-        //TODO: other operators as well including bidirectional "=" operator ...
-    };
-    pulse( root, on_op );
-}
-
 struct Branch {
     string name;
     /** Requires to know the results of execution of these other Branches: */
@@ -348,9 +315,8 @@ auto branch_compositions( Node * root, Layer & previous /*, array of Layers here
         Node * right = nullptr;
         extract( expr, op, left, right );
 
+        //spawns 2 branches where left branch consumes (just arithmetically sums up) all the right branches up to infinity:
         if ( op->content == "@+" ) {
-            //spawns 2 branches:
-
             auto left_branch = new Branch;
             branches.push_back( left_branch );
             left_branch->name = left->content + " = " + to_string( previous.values[ left ] ) + " and consumes right with +:";
@@ -362,6 +328,10 @@ auto branch_compositions( Node * root, Layer & previous /*, array of Layers here
             right_branch->name = s.str();
 
             left_branch->ref( right_branch );
+        }
+        //not exactly sure, but I guess it should spawn all the possible (for current step only left/right branch would suffice, but to completely solve it needs to be the whole space, yes) branches of left and right operands and choose those intersections which equal to each other?
+        else if ( op->content == "=" ) {
+            //TODO:
         }
     };
     pulse( root, on_op );
@@ -376,21 +346,10 @@ auto semantic( Node * root ) {
     Layer layer;
     try_evaluate_all( root, layer );
 
-    /*Layer next;
-    apply_compositions( root, layer, next );
-
-    //after applying compositions here we might be able to obtain proofs about growing only into certain directions, thus providing (synthesizing) program which will just implement such growth (such program can also be expressed in such different way: it's a detangle of programmer-specified entanglement of problem space into 1-dimensional array of computer's memory+operations solution space) ...
-
-    //... but for now we don't know yet how to do it (it shouldn't be impossible though, and actually we don't need to solve any configuration, just some), so just execute some:
-    for ( int i = 0; i < 5; ++ i ) {
-        try_evaluate_all( root, next );
-        Layer future;
-        apply_compositions( root, next, future );
-        next = future;
-    }*/
-
     auto branches = branch_compositions( root, layer );
     cout << "Should spawn " << branches.size() << " branches:" << endl;
     for ( const auto & branch : branches )
         cout << "    branch " << branch->name << endl;
+    
+    //here the spawned branches might get "turned inside-out" (or "rotated" from branches-spawning axis to "leafs"/"leaves" axis) and then all the branches must be solved pair-wise. When any branch in pair-wise solution generation has dependencies on some other branch, then solutions must be generated for every dependency (when such solutions generate SPACEs). When variable's value (or it's ranges) isn't known at the stage of solution generation, then the branch must be prolonged into solution generate state (program state) so that possible future value supply will generate the solution (thus program execution action might require to perform branching again as well).
 }

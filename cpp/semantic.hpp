@@ -360,4 +360,6 @@ auto semantic( Node * root ) {
         cout << "    branch " << branch->name << endl;
     
     //here the spawned branches might get "turned inside-out" (or "rotated" from branches-spawning axis to "leafs"/"leaves" axis) and then all the branches must be solved pair-wise. When any branch in pair-wise solution generation has dependencies on some other branch, then solutions must be generated for every dependency (when such solutions generate SPACEs). When variable's value (or it's ranges) isn't known at the stage of solution generation, then the branch must be prolonged into solution generate state (program state) so that possible future value supply will generate the solution (thus program execution action might require to perform branching again as well).
+
+    //as the process of Program execution there might spawn Branches. Branches might get collapsed into each other if some additional set of input values is provided, thus such state can be interpreted as something intermediate and even stored into file, leaving "dirt" footprint with semantics of what those branches are (which are eager to get collapsed when fed with proper additional inputs). Such "branch-state" can be deduced and thus give us the notion of "arrays": something that has plural instances of the same type: must be evaluated just straight into Branches.
 }

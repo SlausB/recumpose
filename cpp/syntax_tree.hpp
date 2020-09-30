@@ -32,7 +32,7 @@ enum TYPE {
     EQUALITY,
     //the sophisticated (recursive?) one, not just regular function composition; regular one refers to EXPRESSION:
     COMPOSITION,
-    /** Something just named having a bunch of compositions in it. Adds it's compositions into program immunity and can be composed on top as well.*/
+    /** Something just named having a bunch of compositions in it. Adds it's compositions into program immunity and can be composed on top as well. Entities are Types in terms of type-theory. Operations on Entities are operations on Types such that type can be "removed" from the set of executing program.*/
     ENTITY,
 
     SEMANTIC,

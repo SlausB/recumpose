@@ -7,6 +7,26 @@
 #include <cstdlib>
 using namespace std;
 
+/** Should return source name's caption i.e. "falcon" from "../samples/falcon.rcl", etc..*/
+string source_caption( const string & source_name ) {
+    auto start_pos = source_name.find_last_of( '/' );
+    if ( start_pos != string::npos )
+        ++ start_pos;
+    if ( start_pos >= source_name.size() )
+        start_pos = string::npos;
+
+    const auto last_pos = source_name.find_last_of( '.' );
+    const auto len =
+        last_pos == string::npos || start_pos == string::npos
+        ?
+        string::npos
+        :
+        last_pos - start_pos
+    ;
+
+    return source_name.substr( start_pos,  len );
+}
+
 /** DOT language output utility.*/
 struct Plot {
     enum TYPE {

@@ -12,26 +12,6 @@ These entities are like reactive outputs: only resulting value on single entity 
 struct Entity {};
 */
 
-/** Should return source name's caption i.e. "falcon" from "../samples/falcon.rcl", etc..*/
-string source_caption( const string & source_name ) {
-    auto start_pos = source_name.find_last_of( '/' );
-    if ( start_pos != string::npos )
-        ++ start_pos;
-    if ( start_pos >= source_name.size() )
-        start_pos = string::npos;
-
-    const auto last_pos = source_name.find_last_of( '.' );
-    const auto len =
-        last_pos == string::npos || start_pos == string::npos
-        ?
-        string::npos
-        :
-        last_pos - start_pos
-    ;
-
-    return source_name.substr( start_pos,  len );
-}
-
 auto process( const string & source_name )
 {
     auto root = syntactic( source_name );
@@ -48,8 +28,8 @@ auto process( const string & source_name )
 
 int main() {
     //process( "../samples/program_1.rcl" );
-    //process( "../samples/falcon.rcl" );
-    process( "../samples/square_equation.rcl" );
+    process( "../samples/falcon.rcl" );
+    //process( "../samples/square_equation.rcl" );
 
     //every composition needs to be reversible (so to define sqrt() function you'll have to define complex numbers and thus recompose (+),(-),(*), etc)
 

@@ -172,8 +172,14 @@ bool try_evaluate(
         return false;
 
     auto op = find_types( expr->refs, TYPE::OPERATOR );
-    if ( op == nullptr )
-        throw runtime_error( "ERROR: Expected operator" );
+    if ( op == nullptr ) {
+        stringstream s;
+        s << "ERROR: couldn't find an OPERATOR within expr " << expr << " refs:";
+        for ( const auto & ref : expr->refs )
+            s << "    " << ref << endl;
+        cout << s.str() << endl;
+        throw runtime_error( s.str() );
+    }
     
     Node * left = nullptr;
     Node * right = nullptr;
@@ -189,8 +195,10 @@ bool try_evaluate(
         cout << "        cannot evaluate " << expr << " because none of it's both references are evaluated. It's references:" << endl;
         for ( const auto & ref : expr->refs )
             cout << "            " << ref << endl;
-        cout << "        left: " << left << endl;
-        cout << "        right: " << right << endl;
+        if ( left != nullptr )
+            cout << "        left: " << left << endl;
+        if ( right != nullptr )
+            cout << "        right: " << right << endl;
         return false;
     }
 

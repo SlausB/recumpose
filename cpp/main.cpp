@@ -12,22 +12,44 @@ These entities are like reactive outputs: only resulting value on single entity 
 struct Entity {};
 */
 
+/** Should return source name's caption i.e. "falcon" from "../samples/falcon.rcl", etc..*/
+string source_caption( const string & source_name ) {
+    auto start_pos = source_name.find_last_of( '/' );
+    if ( start_pos != string::npos )
+        ++ start_pos;
+    if ( start_pos >= source_name.size() )
+        start_pos = string::npos;
+
+    const auto last_pos = source_name.find_last_of( '.' );
+    const auto len =
+        last_pos == string::npos || start_pos == string::npos
+        ?
+        string::npos
+        :
+        last_pos - start_pos
+    ;
+
+    return source_name.substr( start_pos,  len );
+}
+
 auto process( const string & source_name )
 {
     auto root = syntactic( source_name );
-    plot( root, set{ TYPE::EXPRESSION, TYPE::TERM, TYPE::NONABELIAN }, "semantics" );
 
-    plot( root, set{ TYPE::EXPRESSION, TYPE::TERM, TYPE::ENTITY, TYPE::NONABELIAN }, "expressions" );
+    const auto target_name = source_caption( source_name );
+    cout << "Plotting to " << target_name << endl;
+    plot( root, set{ TYPE::EXPRESSION, TYPE::TERM, TYPE::NONABELIAN }, target_name + "_semantics" );
+    plot( root, set{ TYPE::EXPRESSION, TYPE::TERM, TYPE::ENTITY, TYPE::NONABELIAN }, target_name + "_expressions" );
+
     semantic( root );
 
     cout << "Done." << endl;
 }
 
 int main() {
-    //parse( "../samples/program_1.rcl" );
-    //parse( "../samples/falcon.rcl" );
+    //process( "../samples/program_1.rcl" );
+    //process( "../samples/falcon.rcl" );
     process( "../samples/square_equation.rcl" );
-    //pulse_ast_with_numbered_waves_by_composing_layered_waves_on_entities();
 
     //every composition needs to be reversible (so to define sqrt() function you'll have to define complex numbers and thus recompose (+),(-),(*), etc)
 

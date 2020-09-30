@@ -5,6 +5,7 @@ inputs bird raining
 
 nest
     door <- if bird then opened else closed
+
 falcon
     door @+ if bird == 350 then closed
 falcon @= if ! raining then falcon
